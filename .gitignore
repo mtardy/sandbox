@@ -1,3 +1,6 @@
+# vscode settings
+.vscode/
+
 # ignore generated parser
 calc.c
 

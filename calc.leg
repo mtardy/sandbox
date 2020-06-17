@@ -8,12 +8,17 @@
 
 #define YYSTYPE int
 YYSTYPE yylval = 0;
+int var[26];
 
 %}
 
 start	=	e:exp					{ yylval = e }
 
-exp		=	- s:sum					{ $$ = s }
+exp		=	- (a:assign				{ $$ = a }
+			| s:sum 				{ $$ = s }
+			)
+
+assign	=	l:LETTER EQUAL n:sum	{ $$ = var[l - 'a'] = n }
 
 sum		=	PLUS* l:prod
 			( PLUS+ r:prod			{ l += r }
@@ -23,11 +28,14 @@ sum		=	PLUS* l:prod
 prod	=	l:neg
 			( MULTI		r:neg		{ l *= r }
 			| DIVIDE	r:neg		{ l /= r }
-            | MODULO    r:neg       { l %= r }
+			| MODULO	r:neg		{ l %= r }
 			)*						{ $$ = l }
 
 neg		=	MINUS n:neg				{ $$ = -n }
-			| n:NUMBER				{ $$ = n }
+			| n:value				{ $$ = n }
+
+value	=	n:NUMBER				{ $$ = n }
+			| l:LETTER				{ $$ = var[l - 'a'] }
 
 -		=	[ \t]*
 NUMBER	=	< [0-9]+ >	-			{ $$ = atoi(yytext) }
@@ -35,7 +43,11 @@ PLUS	=	'+'			-
 MINUS	=	'-'			-
 MULTI	=	'*'			-
 DIVIDE	=	'/'			-
-MODULO  =   '%'         -
+MODULO	=	'%'			-
+LETTER	=	(< [a-z] >				{ $$ = yytext[0] }
+			|< [A-Z] >				{ $$ = yytext[0] + 'a' - 'A' }
+			)			-
+EQUAL	=	'='			-
 
 %%
 
@@ -44,6 +56,11 @@ int main(int argc, char **argv)
 	while (yyparse()) {
 		printf("%d\n", yylval);
 	}
+	/*
+	for (int i = 0; i < 26; i++) {
+		printf("var[%d]=%d ", i, var[i]);
+	}
+	*/
 
 	return 0;
 }
