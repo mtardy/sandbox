@@ -5,7 +5,7 @@ cparser: calc.c
 	$(CC) -o calc calc.c
 
 calc.c: calc.leg
-	$(PG) calc.leg > calc.c
+	$(PG) -o calc.c calc.leg
 
 clean:
 	rm calc.c calc
