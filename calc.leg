@@ -1,9 +1,9 @@
 %{
 
-/* compile: leg -o tmp.c tmp.leg
- *			cc -o tmp tmp.c
+/* compile: leg -o calc.c calc.leg
+ *			cc -o calc calc.c
  *
- * run:		echo "hello world" | ./tmp
+ * run:		echo "2+3" | ./calc
  */
 
 #define YYSTYPE int
