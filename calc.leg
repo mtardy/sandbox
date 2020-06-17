@@ -1,0 +1,48 @@
+%{
+
+/* compile: leg -o tmp.c tmp.leg
+ *			cc -o tmp tmp.c
+ *
+ * run:		echo "hello world" | ./tmp
+ */
+
+#define YYSTYPE int
+YYSTYPE yylval = 0;
+
+%}
+
+start	=	e:exp					{ yylval = e }
+
+exp		=	- s:sum					{ $$ = s }
+
+sum		=	PLUS* l:prod
+			( PLUS+ r:prod			{ l += r }
+			| MINUS r:prod			{ l -= r }
+			)*						{ $$ = l }
+
+prod	=	l:neg
+			( MULTI		r:neg		{ l *= r }
+			| DIVIDE	r:neg		{ l /= r }
+            | MODULO    r:neg       { l %= r }
+			)*						{ $$ = l }
+
+neg		=	MINUS n:neg				{ $$ = -n }
+			| n:NUMBER				{ $$ = n }
+
+-		=	[ \t]*
+NUMBER	=	< [0-9]+ >	-			{ $$ = atoi(yytext) }
+PLUS	=	'+'			-
+MINUS	=	'-'			-
+MULTI	=	'*'			-
+DIVIDE	=	'/'			-
+MODULO  =   '%'         -
+%%
+
+int main(int argc, char **argv)
+{
+	while (yyparse()) {
+		printf("%d\n", yylval);
+	}
+
+	return 0;
+}

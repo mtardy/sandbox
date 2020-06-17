@@ -1,0 +1,5 @@
+# ignore generated parser
+calc.c
+
+# ignore compiled parser
+calc
