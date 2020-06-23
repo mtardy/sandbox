@@ -6,9 +6,71 @@
  * run:		echo "2+3" | ./calc
  */
 
-#define YYSTYPE int
-YYSTYPE yylval = 0;
-int var[26];
+#define NSYMBOLS 256
+
+union u_t {
+	int		ival;
+	char	*sval;
+};
+
+typedef struct symbol_t {
+	char	*ident;
+	int		value;
+} symbol_t;
+
+typedef struct table_t {
+	symbol_t	*array[NSYMBOLS];
+	int			size;
+} table_t;
+
+#define YYSTYPE union u_t
+YYSTYPE yylval;
+
+table_t table;
+
+// This buffer is for storing yytext identifier during assignement
+char *ident_buf;
+
+symbol_t* new_symbol(char *ident, int value)
+{
+	symbol_t* s = malloc(sizeof(symbol_t));
+
+	char * ident_copy = malloc(strlen(ident) + 1);
+	strcpy(ident_copy, ident);
+
+	free(ident_buf);
+
+	s->ident = ident_copy;
+	s->value = value;
+	return s;
+}
+
+symbol_t * add(char *ident, int value)
+{
+	symbol_t *new_s = new_symbol(ident, value);
+
+	if (table.size >= NSYMBOLS) {
+		printf("Error: too many symbols\n");
+		exit(1);
+	}
+	int i = table.size;
+	table.array[i] = new_s;
+	table.size++;
+	return table.array[i];
+}
+
+// Returns int value of identifier, when identifier is undefined, returns 0
+int get_value(const char *ident)
+{
+	for(int i=0; i < table.size; i++) {
+		//printf("comparaison %s, %s\n", table.array[i].ident, ident);
+		if (strcmp(table.array[i]->ident, ident) == 0) {
+			return table.array[i]->value;
+		}
+	}
+	// printf("'%s' identifier not found\n", ident);
+	return 0;
+}
 
 %}
 
@@ -18,49 +80,43 @@ exp		=	- (a:assign				{ $$ = a }
 			| s:sum 				{ $$ = s }
 			)
 
-assign	=	l:LETTER EQUAL n:sum	{ $$ = var[l - 'a'] = n }
+assign	=	l:IDENT 				{ ident_buf = strdup(l.sval) } 
+			EQUAL n:sum				{ $$.ival = add(ident_buf, n.ival)->value;}
 
 sum		=	PLUS* l:prod
-			( PLUS+ r:prod			{ l += r }
-			| MINUS r:prod			{ l -= r }
-			)*						{ $$ = l }
+			( PLUS+ r:prod			{ l.ival += r.ival }
+			| MINUS r:prod			{ l.ival -= r.ival }
+			)*						{ $$.ival = l.ival }
 
 prod	=	l:neg
-			( MULTI		r:neg		{ l *= r }
-			| DIVIDE	r:neg		{ l /= r }
-			| MODULO	r:neg		{ l %= r }
-			)*						{ $$ = l }
+			( MULTI		r:neg		{ l.ival *= r.ival }
+			| DIVIDE	r:neg		{ l.ival /= r.ival }
+			| MODULO	r:neg		{ l.ival %= r.ival }
+			)*						{ $$.ival = l.ival }
 
-neg		=	MINUS n:neg				{ $$ = -n }
-			| n:value				{ $$ = n }
+neg		=	MINUS n:neg				{ $$.ival = -n.ival }
+			| n:value				{ $$.ival = n.ival }
 
-value	=	n:NUMBER				{ $$ = n }
-			| l:LETTER				{ $$ = var[l - 'a'] }
+value	=	n:NUMBER				{ $$.ival = n.ival }
+			| l:IDENT				{ $$.ival = get_value(l.sval) }
 
 -		=	[ \t]*
-NUMBER	=	< [0-9]+ >	-			{ $$ = atoi(yytext) }
+NUMBER	=	< [0-9]+ >	-			{ $$.ival = atoi(yytext) }
 PLUS	=	'+'			-
 MINUS	=	'-'			-
 MULTI	=	'*'			-
 DIVIDE	=	'/'			-
 MODULO	=	'%'			-
-LETTER	=	(< [a-z] >				{ $$ = yytext[0] }
-			|< [A-Z] >				{ $$ = yytext[0] + 'a' - 'A' }
-			)			-
 EQUAL	=	'='			-
+IDENT	=	< [a-zA-Z]+ >	-		{ $$.sval = yytext }
 
 %%
 
 int main(int argc, char **argv)
 {
 	while (yyparse()) {
-		printf("%d\n", yylval);
+		printf("%d\n", yylval.ival);
 	}
-	/*
-	for (int i = 0; i < 26; i++) {
-		printf("var[%d]=%d ", i, var[i]);
-	}
-	*/
 
 	return 0;
 }

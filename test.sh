@@ -17,6 +17,7 @@ echo "-3*2+10*2" | ./${PROG} | cmp <(echo "14") && echo "test#11 passed!" || tru
 echo "- 5%  2 +2-6 / 2" | ./${PROG} | cmp <(echo "-2") && echo "test#12 passed!" || true
 echo "a=3" | ./${PROG} | cmp <(echo "3") && echo "test#13 passed!" || true
 echo "a=3 a*2" | ./${PROG} | cmp <(printf "3\n6\n") && echo "test#14 passed!" || true
-echo "a=10 z=13 A+z" | ./${PROG} | cmp <(printf "10\n13\n23\n") && echo "test#15 passed!" || true
+echo "a=10 z=13 a+z" | ./${PROG} | cmp <(printf "10\n13\n23\n") && echo "test#15 passed!" || true
+echo "tamales=10 tomato=2 tamales*tomato" | ./${PROG} | cmp <(printf "10\n2\n20\n") && echo "test#16 passed!" || true
 
 make clean
