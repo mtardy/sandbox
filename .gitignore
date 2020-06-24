@@ -6,3 +6,5 @@ calc.c
 
 # ignore compiled parser
 calc
+
+a.out

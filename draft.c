@@ -1,21 +1,8 @@
-%{
-
-/* compile: leg -o calc.c calc.leg
- *			cc -o calc calc.c
- *
- * run:		echo "2+3" | ./calc
- */
-
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <stdbool.h>
-
-union u_t {
-	int		ival;
-	char	*sval;
-};
-#define YYSTYPE union u_t
-YYSTYPE yylval;
-
-#define SYMBOL_TABLE_CHUNK 1024
+#define SYMBOL_TABLE_CHUNK 4
 
 typedef struct symbol_t {
 	char	*ident;
@@ -35,8 +22,6 @@ typedef struct bsearch_t {
 	int		pos;
 	bool	found;
 } bsearch_t;
-
-char *ident_buf;
 
 bsearch_t binary_search(symbol_t *arr[], int l, int r, char *ident)
 {
@@ -81,6 +66,7 @@ int insert(table_t *table, symbol_t *element, int pos)
 symbol_t *intern(char *ident, bool create)
 {
 	bsearch_t res = binary_search(table.array, 0, table.size - 1, ident);
+	printf("pos:%d\n", res.pos);
 	if (res.found) {
 		return table.array[res.pos];
 	}
@@ -89,20 +75,12 @@ symbol_t *intern(char *ident, bool create)
 		symbol_t *new_symbol = malloc(sizeof(symbol_t));
 		new_symbol->ident = strdup(ident);
 		new_symbol->defined = false;
-		insert(&table, new_symbol, res.pos);
+		printf("insert:%d\n", insert(&table, new_symbol, res.pos));
 		return new_symbol;
 	} else {
 		return NULL;
 	}
 }
-
-symbol_t *update_value(symbol_t * s, int value)
-{
-	s->value = value;
-	s->defined = true;
-	return s;
-}
-
 
 void init_table()
 {
@@ -115,53 +93,26 @@ void init_table()
 	table.capacity = SYMBOL_TABLE_CHUNK;
 }
 
+symbol_t *update_value(symbol_t * s, int value)
+{
+	s->value = value;
+	s->defined = true;
+	return s;
+}
 
-%}
-
-start	=	e:exp					{ yylval = e }
-
-exp		=	- (a:assign				{ $$ = a }
-			| s:sum 				{ $$ = s }
-			)
-
-assign	=	l:IDENT 				{ ident_buf = strdup(l.sval) } 
-			EQUAL n:sum				{ symbol_t *nsymb = intern(ident_buf, true); $$.ival = update_value(nsymb, n.ival)->value; free(ident_buf) }
-
-sum		=	PLUS* l:prod
-			( PLUS+ r:prod			{ l.ival += r.ival }
-			| MINUS r:prod			{ l.ival -= r.ival }
-			)*						{ $$.ival = l.ival }
-
-prod	=	l:neg
-			( MULTI		r:neg		{ l.ival *= r.ival }
-			| DIVIDE	r:neg		{ l.ival /= r.ival }
-			| MODULO	r:neg		{ l.ival %= r.ival }
-			)*						{ $$.ival = l.ival }
-
-neg		=	MINUS n:neg				{ $$.ival = -n.ival }
-			| n:value				{ $$.ival = n.ival }
-
-value	=	n:NUMBER				{ $$.ival = n.ival }
-			| l:IDENT				{ symbol_t *fsymb = intern(l.sval, false); $$.ival = (fsymb != NULL) ? (fsymb->defined == true) ? fsymb->value : 0 : 0 }
-
--		=	[ \t]*
-NUMBER	=	< [0-9]+ >	-			{ $$.ival = atoi(yytext) }
-PLUS	=	'+'			-
-MINUS	=	'-'			-
-MULTI	=	'*'			-
-DIVIDE	=	'/'			-
-MODULO	=	'%'			-
-EQUAL	=	'='			-
-IDENT	=	< [a-zA-Z]+ >	-		{ $$.sval = yytext }
-
-%%
-
-int main(int argc, char **argv)
+int main() 
 {
 	init_table();
-	while (yyparse()) {
-		printf("%d\n", yylval.ival);
-	}
-
-	return 0;
+	char line[256];
+	intern("chaussure\n", true);
+	while (fgets(line, sizeof(line), stdin)) {
+		printf("intern:%p\n", intern(line, true));
+		printf("after size:%d\n", table.size);
+		printf("after capacity:%d\n", table.capacity);
+		printf("\n");
+		for (int i = 0; i < table.size; i++) {
+			printf("%d.%s", i, table.array[i]->ident);
+		}
+		printf("\n");
+	}	
 }
