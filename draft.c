@@ -67,23 +67,18 @@ symbol_t *intern(char *ident, bool create)
 {
 	bsearch_t res = binary_search(table.array, 0, table.size - 1, ident);
 	printf("pos:%d\n", res.pos);
+	if (res.found) {
+		return table.array[res.pos];
+	}
+
 	if (create) {
-		symbol_t *new_symbol;
-		if (res.found) {
-			new_symbol = table.array[res.pos];
-		} else {
-			new_symbol = malloc(sizeof(symbol_t));
-			new_symbol->ident = strdup(ident);
-			new_symbol->defined = false;
-			printf("insert:%d\n", insert(&table, new_symbol, res.pos));
-		}
+		symbol_t *new_symbol = malloc(sizeof(symbol_t));
+		new_symbol->ident = strdup(ident);
+		new_symbol->defined = false;
+		printf("insert:%d\n", insert(&table, new_symbol, res.pos));
 		return new_symbol;
 	} else {
-		if (res.found) {
-			return table.array[res.pos];
-		} else {
-			return NULL;
-		}
+		return NULL;
 	}
 }
 
@@ -96,6 +91,13 @@ void init_table()
 	}
 	table.size = 0;
 	table.capacity = SYMBOL_TABLE_CHUNK;
+}
+
+symbol_t *update_value(symbol_t * s, int value)
+{
+	s->value = value;
+	s->defined = true;
+	return s;
 }
 
 int main() 

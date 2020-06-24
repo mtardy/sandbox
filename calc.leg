@@ -6,71 +6,115 @@
  * run:		echo "2+3" | ./calc
  */
 
-#define NSYMBOLS 256
+#include <stdbool.h>
 
 union u_t {
 	int		ival;
 	char	*sval;
 };
+#define YYSTYPE union u_t
+YYSTYPE yylval;
+
+#define SYMBOL_TABLE_CHUNK 1024
 
 typedef struct symbol_t {
 	char	*ident;
+	bool	defined;
 	int		value;
 } symbol_t;
 
 typedef struct table_t {
-	symbol_t	*array[NSYMBOLS];
+	symbol_t	**array;
 	int			size;
+	int			capacity;
 } table_t;
-
-#define YYSTYPE union u_t
-YYSTYPE yylval;
 
 table_t table;
 
-// This buffer is for storing yytext identifier during assignement
+typedef struct bsearch_t {
+	int		pos;
+	bool	found;
+} bsearch_t;
+
 char *ident_buf;
 
-symbol_t* new_symbol(char *ident, int value)
+bsearch_t binary_search(symbol_t *arr[], int l, int r, char *ident)
 {
-	symbol_t* s = malloc(sizeof(symbol_t));
+	while (r >= l) {
+		int mid = l + (r - l) / 2;
+		int cmpres = strcmp(arr[mid]->ident, ident);
+		if (cmpres > 0) {
+			r = mid - 1;
+		} else if (cmpres < 0) {
+			l = mid + 1;
+		} else {
+			bsearch_t res = { mid, true };
+			return res;
+		}
+	} 
+	bsearch_t res = { l, false };
+	return res;
+}
 
-	char * ident_copy = malloc(strlen(ident) + 1);
-	strcpy(ident_copy, ident);
+int insert(table_t *table, symbol_t *element, int pos)
+{
+	if (pos < 0 || pos > table->size) {
+		return -1;
+	}
 
-	free(ident_buf);
+	if (table->size  >= table->capacity) {
+		table->array = realloc(table->array, sizeof(symbol_t *) * (table->capacity + SYMBOL_TABLE_CHUNK));
+		if (table->array == NULL) {
+			printf("Error: running out of memory\n");
+			exit(1);
+		}
+		table->capacity += SYMBOL_TABLE_CHUNK;
+	}
 
-	s->ident = ident_copy;
+	for (int i = table->size; i > pos; i--) {
+		table->array[i] = table->array[i-1];
+	}
+	table->array[pos] = element;
+	return ++(table->size);
+}
+
+symbol_t *intern(char *ident, bool create)
+{
+	bsearch_t res = binary_search(table.array, 0, table.size - 1, ident);
+	if (res.found) {
+		return table.array[res.pos];
+	}
+
+	if (create) {
+		symbol_t *new_symbol = malloc(sizeof(symbol_t));
+		new_symbol->ident = strdup(ident);
+		new_symbol->defined = false;
+		insert(&table, new_symbol, res.pos);
+		return new_symbol;
+	} else {
+		return NULL;
+	}
+}
+
+symbol_t *update_value(symbol_t * s, int value)
+{
 	s->value = value;
+	s->defined = true;
 	return s;
 }
 
-symbol_t * add(char *ident, int value)
-{
-	symbol_t *new_s = new_symbol(ident, value);
 
-	if (table.size >= NSYMBOLS) {
-		printf("Error: too many symbols\n");
-		exit(1);
+void init_table()
+{
+	table.array = malloc(sizeof(symbol_t *) * SYMBOL_TABLE_CHUNK);
+	if (table.array == NULL) {
+			printf("Error: running out of memory\n");
+			exit(1);
 	}
-	int i = table.size;
-	table.array[i] = new_s;
-	table.size++;
-	return table.array[i];
+	table.size = 0;
+	table.capacity = SYMBOL_TABLE_CHUNK;
 }
 
-// Returns int value of identifier, when identifier is undefined, returns 0
-int get_value(const char *ident)
-{
-	for(int i=0; i < table.size; i++) {
-		//printf("comparaison %s, %s\n", table.array[i].ident, ident);
-		if (strcmp(table.array[i]->ident, ident) == 0) {
-			return table.array[i]->value;
-		}
-	}
-	// printf("'%s' identifier not found\n", ident);
-	return 0;
-}
 
 %}
 
@@ -81,7 +125,7 @@ exp		=	- (a:assign				{ $$ = a }
 			)
 
 assign	=	l:IDENT 				{ ident_buf = strdup(l.sval) } 
-			EQUAL n:sum				{ $$.ival = add(ident_buf, n.ival)->value;}
+			EQUAL n:sum				{ symbol_t *nsymb = intern(ident_buf, true); $$.ival = update_value(nsymb, n.ival)->value; free(ident_buf) }
 
 sum		=	PLUS* l:prod
 			( PLUS+ r:prod			{ l.ival += r.ival }
@@ -98,7 +142,7 @@ neg		=	MINUS n:neg				{ $$.ival = -n.ival }
 			| n:value				{ $$.ival = n.ival }
 
 value	=	n:NUMBER				{ $$.ival = n.ival }
-			| l:IDENT				{ $$.ival = get_value(l.sval) }
+			| l:IDENT				{ symbol_t *fsymb = intern(l.sval, false); $$.ival = (fsymb != NULL) ? (fsymb->defined == true) ? fsymb->value : 0 : 0 }
 
 -		=	[ \t]*
 NUMBER	=	< [0-9]+ >	-			{ $$.ival = atoi(yytext) }
@@ -114,6 +158,7 @@ IDENT	=	< [a-zA-Z]+ >	-		{ $$.sval = yytext }
 
 int main(int argc, char **argv)
 {
+	init_table();
 	while (yyparse()) {
 		printf("%d\n", yylval.ival);
 	}
