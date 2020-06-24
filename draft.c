@@ -10,7 +10,6 @@ typedef struct symbol_t {
 	int		value;
 } symbol_t;
 
-
 typedef struct table_t {
 	symbol_t	**array;
 	int			size;
@@ -69,13 +68,13 @@ symbol_t *intern(char *ident, bool create)
 	bsearch_t res = binary_search(table.array, 0, table.size - 1, ident);
 	printf("pos:%d\n", res.pos);
 	if (create) {
-		symbol_t *new_symbol = malloc(sizeof(symbol_t));
-		new_symbol->ident = strdup(ident);
-		new_symbol->defined = false;
+		symbol_t *new_symbol;
 		if (res.found) {
-			free(table.array[res.pos]);
-			table.array[res.pos] = new_symbol;
+			new_symbol = table.array[res.pos];
 		} else {
+			new_symbol = malloc(sizeof(symbol_t));
+			new_symbol->ident = strdup(ident);
+			new_symbol->defined = false;
 			printf("insert:%d\n", insert(&table, new_symbol, res.pos));
 		}
 		return new_symbol;

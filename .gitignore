@@ -1,11 +1,10 @@
 # vscode settings
 .vscode/
 
-# dicho
-dicho.c
-
 # ignore generated parser
 calc.c
 
 # ignore compiled parser
 calc
+
+a.out
