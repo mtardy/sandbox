@@ -161,7 +161,9 @@ oop intern(char *ident)
 oop update_symbol_value(oop symbol, oop integer)
 {
 	_checkType(symbol, Symbol);
-	_checkType(integer, Integer);
+	// For now it will fail with assigning to null
+	// because for now we can write "a=2 b=a" because everything is passed by value
+	_checkType(integer, Integer); 
 	symbol->Symbol.value = integer;
 	return symbol;
 }
@@ -191,17 +193,19 @@ neg		=	MINUS n:neg				{ set(n, Integer, value, -get(n, Integer, value)); $$ = n 
 			| n:value				{ $$ = n }
 
 value	=	n:NUMBER				{ $$ = n }
+			| NULL					{ $$ = null; // For now it doesn't work because of _checktype in update_symbol_value() }
 			| l:IDENT				{ $$ = get(l, Symbol, value); // Will result in an assertion failed if ident is undefined }
 
 -		=	[ \t]*
 NUMBER	=	< [0-9]+ >	-			{ $$ = makeInteger(atoi(yytext)) }
+IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = intern(yytext) }
 PLUS	=	'+'			-
 MINUS	=	'-'			-
 MULTI	=	'*'			-
 DIVIDE	=	'/'			-
 MODULO	=	'%'			-
 EQUAL	=	'='			-
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = intern(yytext) }
+NULL	=	'null'		-
 
 %%
 
