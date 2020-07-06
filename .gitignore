@@ -8,3 +8,6 @@ calc.c
 calc
 
 a.out
+
+# macOS artifcats
+.DS_Store

@@ -1,12 +1,6 @@
-%{
-
-/* compile: leg -o calc.c calc.leg
- *			cc -o calc calc.c
- *
- * run:		echo "2+3" | ./calc
- */
-
-
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <sysexits.h>
 #include <assert.h>
@@ -18,9 +12,6 @@ typedef enum { Undefined, Integer, Symbol } type_t;
 
 union object;
 typedef union object *oop;
-
-#define YYSTYPE oop
-YYSTYPE yylval;
 
 struct Undefined {
 	type_t type;
@@ -103,7 +94,7 @@ void println(oop ast)
 	printf("\n");
 }
 
-#define SYMBOL_TABLE_CHUNK 1024
+#define SYMBOL_TABLE_CHUNK 4
 
 typedef struct table_t {
 	oop    *array;
@@ -166,50 +157,24 @@ oop update_symbol_value(oop symbol, oop integer)
 	return symbol;
 }
 
-%}
-
-start	=	e:exp					{ yylval = e }
-
-exp		=	- (a:assign				{ $$ = a }
-			| s:sum 				{ $$ = s }
-			)
-
-assign	=	l:IDENT EQUAL n:sum		{ $$ = update_symbol_value(l, n) }
-
-sum		=	PLUS* l:prod
-			( PLUS+ r:prod			{ get(l, Integer, value) += get(r, Integer, value) }
-			| MINUS r:prod			{ get(l, Integer, value) -= get(r, Integer, value) }
-			)*						{ $$ = l }
-
-prod	=	l:neg
-			( MULTI		r:neg		{ get(l, Integer, value) *= get(r, Integer, value) }
-			| DIVIDE	r:neg		{ get(l, Integer, value) /= get(r, Integer, value) }
-			| MODULO	r:neg		{ get(l, Integer, value) %= get(r, Integer, value) }
-			)*						{ $$ = l }
-
-neg		=	MINUS n:neg				{ set(n, Integer, value, -get(n, Integer, value)); $$ = n }
-			| n:value				{ $$ = n }
-
-value	=	n:NUMBER				{ $$ = n }
-			| l:IDENT				{ $$ = get(l, Symbol, value); // Will result in an assertion failed if ident is undefined }
-
--		=	[ \t]*
-NUMBER	=	< [0-9]+ >	-			{ $$ = makeInteger(atoi(yytext)) }
-PLUS	=	'+'			-
-MINUS	=	'-'			-
-MULTI	=	'*'			-
-DIVIDE	=	'/'			-
-MODULO	=	'%'			-
-EQUAL	=	'='			-
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = intern(yytext) }
-
-%%
-
-int main(int argc, char **argv)
+int main()
 {
-	while (yyparse()) {
-		println(yylval);
+	char *line= 0;      	    // this and
+	size_t linecap= 0;  	    // this are needed for getline()
+	intern("chaussure");  // identifiers will have no trailing newline so let's test with no trailing newline
+	printf("Enter identifier names!\n");
+	for (;;) {                  // using an infinite loop simplifies the break/continue logic in the body
+		ssize_t len= getline(&line, &linecap, stdin);              // use getline() to auto-grow the buffer when necessary
+		if (len < 0) break;                                        // stop at EOF
+		while ((len > 0) && ('\n' == line[len-1])) line[--len]= 0; // trim newlines from the end
+		if (len < 1) continue;                                     // ignore empty lines
+		printf("intern : %p\n", intern(line));
+		printf("after size : %zi\n", table.size);
+		printf("after capacity : %zi\n", table.capacity);
+		printf("\n");
+		for (int i = 0; i < table.size; i++) {
+			printf("%i %s\n", i, get(table.array[i], Symbol, name));
+		}
+		printf("\n");
 	}
-
-	return 0;
 }
