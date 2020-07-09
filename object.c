@@ -74,7 +74,6 @@ oop _checkType(oop ptr, type_t type) {
 }
 
 // added parens around expansion to protect assignment
-
 #define get(PTR, TYPE, FIELD)			(_checkType(PTR, TYPE)->TYPE.FIELD)
 #define set(PTR, TYPE, FIELD, VALUE)	(_checkType(PTR, TYPE)->TYPE.FIELD = VALUE)
 
@@ -257,16 +256,12 @@ ssize_t table_search(table_t *table, char *ident)
 // ssize_t result because -1 means 'error'
 ssize_t table_insert(table_t *table, oop object, size_t pos)
 {
-	// Should I use in my code a function starting with _ or is it a convention to prevent its usage ?
-	/// You should never really have to use that function except implicitly via get/set.
-	/// If you need to insist on a particular type, check it explicitly and produce a real error messge or assertion failure.
 	assert(is(Symbol, object));
 	if (pos > table->size) {  // don't need to check for pos < 0 because size_t is unsigned
 		return -1;
 	}
 
 	if (table->size  >= table->capacity) {
-		// on the first call table->array will be NULL and realloc() will behave like malloc()
 		table->array = memcheck(realloc(table->array, sizeof(oop) * (table->capacity + SYMBOL_TABLE_CHUNK)));
 		table->capacity += SYMBOL_TABLE_CHUNK;
 	}
