@@ -2,9 +2,14 @@
 
 ## Requirements
 
-Please install peg/leg manually or with Homebrew:
+Please install [peg/leg](https://www.piumarta.com/software/peg/) manually or with Homebrew:
 ```bash
 $ brew install peg
+```
+
+Please install [the Boehm-Demers-Weiser conservative garbage collector](https://www.hboehm.info/gc/) manually or with Homebrew:
+```bash
+$ brew install bdw-gc
 ```
 
 ## Build
@@ -16,11 +21,17 @@ $ make
 ## Usage
 
 ```bash
-$ echo "2+3" | ./calc
+$ echo "a=2+3 a*2" | ./calc
 ```
 
-## Test
+## Tests
 
+Simple tests:
 ```bash
 $ ./test.sh
+```
+
+Custom test:
+```bash
+$ ./calc < test.txt
 ```
