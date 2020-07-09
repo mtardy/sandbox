@@ -84,7 +84,9 @@ sign	=	MINUS n:sign			{ set(n, Integer, value, -get(n, Integer, value));  $$ = n
 value	=	n:NUMBER				{ $$ = n }
 		|	NULL					{ $$ = null }
 		|	i:IDENT DOT s:STRING	{ $$ = map_get(get(i, Symbol, value), s) }
-		|	i:IDENT LBRAC p:prim RBRAC	{ $$ = map_get(get(i, Symbol, value), p) }
+# Here between the [ ] I put an exp but the only possible type is String so it is pretty limited
+# And I might directly write "prim"?
+		|	i:IDENT LBRAC p:exp RBRAC	{ $$ = map_get(get(i, Symbol, value), p) }
 		|	i:IDENT					{ $$ = get(i, Symbol, value) }
 
 -		=	[ \t\n\r]*
