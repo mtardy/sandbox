@@ -3,10 +3,9 @@
 
 # ignore generated parser
 calc.c
-
-# ignore compiled parser
 calc
-
+calc.dSYM/
+NOTES.txt
 a.out
 
 # macOS artifcats

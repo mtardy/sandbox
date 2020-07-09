@@ -1,0 +1,6 @@
+myObj = { prop1: 12+2, prop2: { subProp1: "hey", subProp2: --12 } } 
+myStr = "prop1"
+myObj[myStr]
+myObj.prop2
+myObj.undefinedProp
+del myObj.prop1
