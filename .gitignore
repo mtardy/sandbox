@@ -4,6 +4,7 @@
 # ignore generated parser
 calc.c
 calc
+calc.dSYM/
 NOTES.txt
 a.out
 

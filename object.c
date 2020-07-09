@@ -6,7 +6,7 @@
 #define malloc(n)	GC_MALLOC(n)
 #define realloc(o, n)	GC_REALLOC(o, n)
 
-typedef enum { Undefined, Integer, Symbol } type_t;
+typedef enum { Undefined, Integer, String, Symbol, Map } type_t;
 
 union object;
 typedef union object *oop;
@@ -20,6 +20,12 @@ struct Integer {
 	int    value;
 };
 
+struct String {
+	type_t	type;
+	char   *value;
+	size_t	size;
+};
+
 struct Symbol {
 	type_t  type;
 	char   *name;
@@ -28,11 +34,25 @@ struct Symbol {
 #   endif // defined(SYMBOL_PAYLOAD)
 };
 
+struct Pair {
+	oop key;
+	oop value;
+};
+
+struct Map {
+	type_t 			type;
+    struct Pair	   *elements;  // even are keys, odd are values   [ key val key val key val ]
+    size_t			size;
+    size_t  		capacity;
+};
+
 union object {
 	type_t           type;
 	struct Undefined Undefined;
 	struct Integer   Integer;
+	struct String	 String;	
 	struct Symbol    Symbol;
+	struct Map		 Map;
 };
 
 union object _null = { .Undefined = { Undefined } };
@@ -55,7 +75,7 @@ oop _checkType(oop ptr, type_t type) {
 
 // added parens around expansion to protect assignment
 
-#define get(PTR, TYPE, FIELD)		(_checkType(PTR, TYPE)->TYPE.FIELD)
+#define get(PTR, TYPE, FIELD)			(_checkType(PTR, TYPE)->TYPE.FIELD)
 #define set(PTR, TYPE, FIELD, VALUE)	(_checkType(PTR, TYPE)->TYPE.FIELD = VALUE)
 
 void *memcheck(void *ptr)
@@ -74,6 +94,14 @@ oop makeInteger(int value) {
 	return newInt;
 }
 
+oop makeString(char *value) {
+	oop newString = memcheck(malloc(sizeof(union object)));
+	newString->type = String;
+	newString->String.value = memcheck(strdup(value));
+	newString->String.size = strlen(value);
+	return newString;
+}
+
 oop makeSymbol(char *name) {
 	oop newSymb = memcheck(malloc(sizeof(union object)));
 	newSymb->type = Symbol;
@@ -84,6 +112,82 @@ oop makeSymbol(char *name) {
 	return newSymb;
 }
 
+oop makeMap() {
+	oop newMap = memcheck(malloc(sizeof(union object)));
+	newMap->type = Map;
+	return newMap;
+}
+
+ssize_t map_search(oop map, oop key)
+{
+	assert(map);  assert(key);
+	ssize_t l = 0, r = get(map, Map, size) - 1;
+	while (l <= r) {
+		ssize_t mid = (l + r) / 2;
+		int cmpres = strcmp(get(get(map, Map, elements)[mid].key, String, value), get(key, String, value));
+		if      (cmpres > 0) 	r = mid - 1;
+		else if (cmpres < 0) 	l = mid + 1;
+		else 					return mid;  // non-negative result => element found at this index
+	}
+	return -1 - l;  // negative result => 'not found', reflected around -1 instead of 0 to allow 'not found' at index 0
+}
+
+oop map_get(oop map, oop key) {
+	assert(is(Map, map));
+	assert(is(String, key));
+	ssize_t pos = map_search(map, key);
+	if (pos < 0) return null;
+    return get(map, Map, elements)[pos].value;
+}
+
+#define MAP_CHUNK_SIZE 8
+
+oop map_set(oop map, oop key, oop value) {
+	assert(is(Map, map));
+	assert(is(String, key));
+	assert(value);
+	ssize_t pos = map_search(map, key);
+	if (pos >= 0) {
+		get(map, Map, elements)[pos].value = value;
+		// In your opinion, which is better in C
+		// - Writing "return map" here and then write the rest of the function's code flat
+		// - Or use this if / else statement (like here) because of the symmetry of the pb 
+		//   and the fact that we return the same stuff anyway
+	} else {
+		pos = -1 - pos;
+		// check capacity and expand if needed
+		if (get(map, Map, size) >= get(map, Map, capacity)) {
+			size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
+			set(map, Map, elements, memcheck(realloc(
+				get(map, Map, elements), 
+				sizeof(struct Pair) * newCapacity))
+			);
+			set(map, Map, capacity, newCapacity);
+		}
+		// insert
+		memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * get(map, Map, size) - pos);
+		// Maybe this syntax is not very nice and I should access the Pair stuff differently?
+		// I mean modifying something on a line that begin with "get"... :/
+		get(map, Map, elements)[pos].value = value;
+		get(map, Map, elements)[pos].key = key;
+		set(map, Map, size, ++get(map, Map, size));
+	}
+    return map;
+}
+
+oop map_del(oop map, oop key) {
+	assert(is(Map, map));
+	assert(is(String, key));
+	ssize_t pos = map_search(map, key);
+	if (pos < 0) return map;
+	if (pos < get(map, Map, size) - 1) {
+		memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * get(map, Map, size) - pos);
+	}
+	set(map, Map, size, --get(map, Map, size));
+    return map;
+}
+
+
 void print(oop ast) {
 	assert(ast);
 	switch (ast->type) {
@@ -93,9 +197,26 @@ void print(oop ast) {
 	case Integer:
 		printf("%i", get(ast, Integer, value));
 		return;
+	case String:
+		printf("'%s'", get(ast, String, value));
+		return;
 	case Symbol:
 		printf("%s=", get(ast, Symbol, name));
 		print(get(ast, Symbol, value));
+		return;
+	case Map:
+		printf("{");
+		for (size_t i = 0; i < get(ast, Map, size); i++) {
+			printf(" ");
+			// I could write this instead but I want a special print for my string key name
+			// print(get(ast, map, elements)[i].key);
+			printf("%s", get(get(ast, Map, elements)[i].key, String, value));
+			printf(": ");
+			print(get(ast, Map, elements)[i].value);
+			if (i < get(ast, Map, size) - 1) printf(",");
+			else printf(" ");
+		}
+		printf("}");
 		return;
 	}
 	assert(0);

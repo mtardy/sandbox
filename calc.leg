@@ -6,11 +6,11 @@
  * run:		( echo a=2*3; echo b=3+4; echo c=a*b ) | ./calc
  */
 
-#define SYMBOL_PAYLOAD				\
+#define SYMBOL_PAYLOAD			\
 	oop     value;				\
 	int     defined
 
-#define SYMBOL_INITIALISE(S)			\
+#define SYMBOL_INITIALISE(S)	\
 	S.value = null;				\
 	S.defined = false
 
@@ -24,7 +24,7 @@ oop update_symbol_value(oop symbol, oop integer)
 	// For now it will fail with assigning to null
 	// because for now we can write "a=2 b=a" because everything is passed by value
 	//_checkType(integer, Integer);
-	set(symbol, Symbol,value, integer); // checktyype is implicit, and it's ok for symbols to store any object value?
+	set(symbol, Symbol, value, integer); // checktyype is implicit, and it's ok for symbols to store any object value?
 	return symbol;
 }
 
@@ -36,34 +36,61 @@ YYSTYPE yylval;
 
 start	=	e:exp					{ yylval = e }
 
-exp	=	- (a:assign				{ $$ = a }
-		| s:sum 				{ $$ = s }
-		)
+exp		=	- (a:assign				{ $$ = a }
+			| d:delete				{ $$ = d }
+			| p:prim 				{ $$ = p }
+			)
 
-assign	=	l:IDENT EQUAL n:sum			{ $$ = update_symbol_value(l, n) }
+assign	=	l:IDENT EQUAL p:prim	{ $$ = update_symbol_value(l, p) }
 
-sum	=	l:prod ### removed PLUS* from beginning and made + a prefix operator just like - instead
+# it is really unhappy that I have to repeate the code in value because
+# I need both information: map identifier and the key
+delete	=	DEL 
+			(	i:IDENT DOT p:STRING
+			|	i:IDENT LBRAC p:prim RBRAC
+			)						{ $$ = map_del(get(i, Symbol, value), p) }
+
+prim	=	( s:sum					{ $$ = s } 
+			| s:string 				{ $$ = s }
+			| m:map					{ $$ = m }
+			)
+
+# Map
+map		=	LCB RCB					{ $$ = makeMap() }
+		|	LCB p:prop RCB			{ $$ = p; }
+
+prop	=	k:STRING COLON v:prim COMMA p:prop				{ $$ = map_set(p, k, v) }
+		|	k:STRING COLON v:prim							{ $$ = map_set(makeMap(), k, v) }
+
+# String
+string	=	(SQUOTE | DQUOTE) s:STRING (SQUOTE | DQUOTE)	{ $$ = s }
+
+# Number
+sum		=	l:prod
 			( PLUS+ r:prod			{ get(l, Integer, value) += get(r, Integer, value) }
 			| MINUS r:prod			{ get(l, Integer, value) -= get(r, Integer, value) }
-			)*				{ $$ = l }
+			)*						{ $$ = l }
 
-prod	=	l:neg
-			( MULTI		r:neg		{ get(l, Integer, value) *= get(r, Integer, value) }
-			| DIVIDE	r:neg		{ get(l, Integer, value) /= get(r, Integer, value) }
-			| MODULO	r:neg		{ get(l, Integer, value) %= get(r, Integer, value) }
-			)*				{ $$ = l }
+prod	=	l:sign
+			( MULTI		r:sign		{ get(l, Integer, value) *= get(r, Integer, value) }
+			| DIVIDE	r:sign		{ get(l, Integer, value) /= get(r, Integer, value) }
+			| MODULO	r:sign		{ get(l, Integer, value) %= get(r, Integer, value) }
+			)*						{ $$ = l }
 
-neg	=	MINUS n:neg				{ set(n, Integer, value, -get(n, Integer, value));  $$ = n }
-	|       PLUS  n:neg				{ $$ = n } ### moved from sum
-	|	n:value					{ $$ = n }
+sign	=	MINUS n:sign			{ set(n, Integer, value, -get(n, Integer, value));  $$ = n }
+		|	PLUS  n:sign			{ $$ = n }
+		|	n:value					{ $$ = n }
 
 value	=	n:NUMBER				{ $$ = n }
-	|	NULL					{ $$ = null; /* For now it doesn't work because of _checktype in update_symbol_value() */ }
-	|	l:IDENT					{ $$ = get(l, Symbol, value); // Will result in an assertion failed if ident is undefined }
+		|	NULL					{ $$ = null }
+		|	i:IDENT DOT s:STRING	{ $$ = map_get(get(i, Symbol, value), s) }
+		|	i:IDENT LBRAC p:prim RBRAC	{ $$ = map_get(get(i, Symbol, value), p) }
+		|	i:IDENT					{ $$ = get(i, Symbol, value) }
 
--	=	[ \t\n\r]* ### added newline and carriage return to allow multi-line `programs'
-NUMBER	=	< [0-9]+ >	-			{ $$ = makeInteger(atoi(yytext)) }
+-		=	[ \t\n\r]*
 IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = intern(yytext) }
+STRING	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = makeString(yytext) }
+NUMBER	=	< [0-9]+ >	-					{ $$ = makeInteger(atoi(yytext)) }
 PLUS	=	'+'			-
 MINUS	=	'-'			-
 MULTI	=	'*'			-
@@ -71,6 +98,16 @@ DIVIDE	=	'/'			-
 MODULO	=	'%'			-
 EQUAL	=	'='			-
 NULL	=	'null'		-
+DEL		=	'del'		-
+COLON	=	':'			-
+COMMA	=	','			-
+DOT		=	'.'			-
+LCB		=	'{'			-
+RCB		=	'}'			-
+LBRAC	=	'['			-
+RBRAC	=	']'			-
+DQUOTE	=	'"'			-
+SQUOTE	=	"'"			-
 
 %%
 
