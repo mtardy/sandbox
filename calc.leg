@@ -20,11 +20,7 @@
 
 oop update_symbol_value(oop symbol, oop integer)
 {
-	//_checkType(symbol, Symbol);
-	// For now it will fail with assigning to null
-	// because for now we can write "a=2 b=a" because everything is passed by value
-	//_checkType(integer, Integer);
-	set(symbol, Symbol, value, integer); // checktyype is implicit, and it's ok for symbols to store any object value?
+	set(symbol, Symbol, value, integer);
 	return symbol;
 }
 
