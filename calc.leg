@@ -44,7 +44,6 @@ exp     =   l:IDENT                             EQUAL p:exp	{ $$ = update_symbol
             |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   s:sum                                       { $$ = s }
 
-# Number
 sum     =   l:prod
             ( PLUS+ r:prod          { get(l, Integer, value) += get(r, Integer, value) }
             | MINUS r:prod          { get(l, Integer, value) -= get(r, Integer, value) }
@@ -60,16 +59,16 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |   PLUS  n:prefix              { $$ = n }
         |         n:postfix             { $$ = n }
 
-postfix =	i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
+postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
                     | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
-                    | p:parameterList		                    { i = apply(i, p) }
+                    | p:parameterList                           { i = apply(i, p) }
                     ) *                                         { $$ = i }
 
 parameterList = LPAREN  m:makeMap
                 ( e:exp             { map_append(m, e) }
-                    ( COMMA e:exp   { map_append(m, e) }
-                    ) *
+                ( COMMA e:exp       { map_append(m, e) }
+                ) *
                 ) ?
                 RPAREN              { $$ = m }
 
@@ -90,8 +89,8 @@ symbol  =   HASH    ( i:IDENT                   { $$ = i }
 
 map     =   LCB   m:makeMap
             (           k:IDENT COLON v:exp     { map_set(m, k, v) }
-                ( COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
-                ) *
+            (     COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
+            ) *
             ) ?
             RCB                                 { $$ = m }
 
