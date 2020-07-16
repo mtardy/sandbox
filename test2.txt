@@ -55,11 +55,17 @@ myObj[42]
 
 exit
 
-
+"checkpoint 8"
 
 sys = {}
+
+"checkpoint 9"
+
 sys.id = "i am sys obj"
 
+"checkpoint 10"
 sys.bye = exit
+
+"checkpoint 10"
 
 sys.bye(1,2,3)

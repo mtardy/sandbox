@@ -16,7 +16,7 @@
 
 #include "object.c"
 
-oop globals;
+//oop globals;
 
 // this should stay out of object.c because it manipulates Symbol members defined in this file
 
@@ -133,7 +133,7 @@ oop prim_exit(oop params)
 
 int main(int argc, char **argv)
 {
-        // globals = makeMap();
+    globals = makeMap();
 
     set(intern("exit"), Symbol, value, makeFunction(prim_exit)); // map_set(globals, intern("exit"), makeFunction(prim_exit));
 

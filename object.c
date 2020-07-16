@@ -49,6 +49,7 @@ struct Function {
     primitive_t primitive;
 };
 
+// usefull for map's elements
 struct Pair {
     oop key;
     oop value;
@@ -171,7 +172,7 @@ int oopcmp(oop a, oop b)
 
 ssize_t map_search(oop map, oop key)
 {
-    assert(map);
+    assert(is(Map, map));
     assert(key);
     ssize_t l = 0, r = get(map, Map, size) - 1;
     while (l <= r) {
@@ -195,33 +196,49 @@ oop map_get(oop map, oop key)
 
 #define MAP_CHUNK_SIZE 8
 
+oop map_insert(oop map, oop key, oop value, size_t pos)
+{
+    assert(is(Map, map));
+    assert(key);
+    assert(value);
+    printf("inserting in map, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
+    if (pos > get(map, Map, size)) { // don't need to check for pos < 0 because size_t is unsigned
+        fprintf(stderr, "\nTrying to insert in a map out of bound\n");
+        assert(-1);
+    }
+
+    // check capacity and expand if needed
+    if (get(map, Map, size) >= get(map, Map, capacity)) {
+        printf("expanding, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
+        size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
+        set(map, Map, elements, memcheck(realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity)));
+        set(map, Map, capacity, newCapacity);
+        printf("expanded, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
+    }
+
+    // insert
+    printf("before memmove\n");
+    memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * get(map, Map, size) - pos);
+    // Maybe this syntax is not very nice and I should access the Pair stuff differently?
+    // I mean modifying something on a line that begin with "get"... :/
+    get(map, Map, elements)[pos].value = value;
+    get(map, Map, elements)[pos].key = key;
+    set(map, Map, size, ++get(map, Map, size));
+
+    return map;
+}
+
 oop map_set(oop map, oop key, oop value)
 {
     assert(is(Map, map));
-    //assert(is(String, key));
+    assert(key);
     assert(value);
     ssize_t pos = map_search(map, key);
     if (pos >= 0) {
         get(map, Map, elements)[pos].value = value;
-        // In your opinion, which is better in C
-        // - Writing "return map" here and then write the rest of the function's code flat
-        // - Or use this if / else statement (like here) because of the symmetry of the pb
-        //   and the fact that we return the same stuff anyway
     } else {
         pos = -1 - pos;
-        // check capacity and expand if needed
-        if (get(map, Map, size) >= get(map, Map, capacity)) {
-            size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
-            set(map, Map, elements, memcheck(realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity)));
-            set(map, Map, capacity, newCapacity);
-        }
-        // insert
-        memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * get(map, Map, size) - pos);
-        // Maybe this syntax is not very nice and I should access the Pair stuff differently?
-        // I mean modifying something on a line that begin with "get"... :/
-        get(map, Map, elements)[pos].value = value;
-        get(map, Map, elements)[pos].key = key;
-        set(map, Map, size, ++get(map, Map, size));
+        map_insert(map, key, value, pos);
     }
     return map;
 }
@@ -288,61 +305,17 @@ void println(oop ast)
     printf("\n");
 }
 
-#define SYMBOL_TABLE_CHUNK 1024
-
-typedef struct table_t
-{
-    oop *array;
-    size_t size;
-    size_t capacity;
-} table_t;
-
-#define TABLE_INITIALISER \
-    {                     \
-        NULL, 0, 0        \
-    } // first call to table_insert() will initialise storage
-
-table_t table = TABLE_INITIALISER; // safe but not strictly needed on Unix because BSS segment is initialised to all zeroes
-
-ssize_t table_search(table_t *table, char *ident)
-{
-    assert(table);
-    assert(ident);
-    ssize_t l = 0, r = table->size - 1;
-    while (l <= r) {
-        ssize_t mid = (l + r) / 2;
-        int cmpres = strcmp(get(table->array[mid], Symbol, name), ident);
-        if (cmpres > 0)         r = mid - 1;
-        else if (cmpres < 0)    l = mid + 1;
-        else                    return mid; // non-negative result => element found at this index
-    }
-    return -1 - l; // negative result => 'not found', reflected around -1 instead of 0 to allow 'not found' at index 0
-}
-
-// ssize_t result because -1 means 'error'
-ssize_t table_insert(table_t *table, oop object, size_t pos)
-{
-    assert(is(Symbol, object));
-    if (pos > table->size) { // don't need to check for pos < 0 because size_t is unsigned
-        return -1;
-    }
-
-    if (table->size >= table->capacity) {
-        table->array = memcheck(realloc(table->array, sizeof(oop) * (table->capacity + SYMBOL_TABLE_CHUNK)));
-        table->capacity += SYMBOL_TABLE_CHUNK;
-    }
-
-    memmove(table->array + pos + 1, table->array + pos, sizeof(*table->array) * (table->size - pos));
-    table->array[pos] = object;
-    return ++(table->size);
-}
+oop globals;
 
 oop intern(char *ident)
 {
-    ssize_t res = table_search(&table, ident); // < 0 => not found
-    if (res >= 0)   return table.array[res];
-    res = -1 - res; // 'un-negate' the result by reflecting it around X=-1
-    oop new_symbol = makeSymbol(memcheck(strdup(ident)));
-    table_insert(&table, new_symbol, res);
-    return new_symbol;
+    oop symbol = makeSymbol(memcheck(strdup(ident)));
+    ssize_t pos = map_search(globals, symbol);
+    if (pos >= 0)   {
+        return get(globals, Map, elements)[pos].key; // So it this case symbol will be garbage collected right?
+    }
+    pos = -1 - pos; // 'un-negate' the result by reflecting it around X=-1
+    map_insert(globals, symbol, null, pos);
+    return symbol;
 }
+ 
