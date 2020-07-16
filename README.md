@@ -1,4 +1,4 @@
-# Basic calculator
+# Javascrypt
 
 ## Requirements
 
