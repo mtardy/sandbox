@@ -221,7 +221,7 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
     get(map, Map, elements)[pos].key = key;
     set(map, Map, size, ++get(map, Map, size));
 
-    return map;
+    return value;
 }
 
 oop map_set(oop map, oop key, oop value)
@@ -236,7 +236,7 @@ oop map_set(oop map, oop key, oop value)
         pos = -1 - pos;
         map_insert(map, key, value, pos);
     }
-    return map;
+    return value;
 }
 
 oop map_del(oop map, oop key)
