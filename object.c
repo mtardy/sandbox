@@ -194,14 +194,13 @@ oop map_get(oop map, oop key)
     return get(map, Map, elements)[pos].value;
 }
 
-#define MAP_CHUNK_SIZE 8
+#define MAP_CHUNK_SIZE 4
 
 oop map_insert(oop map, oop key, oop value, size_t pos)
 {
     assert(is(Map, map));
     assert(key);
     assert(value);
-    printf("inserting in map, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
     if (pos > get(map, Map, size)) { // don't need to check for pos < 0 because size_t is unsigned
         fprintf(stderr, "\nTrying to insert in a map out of bound\n");
         assert(-1);
@@ -209,16 +208,13 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
 
     // check capacity and expand if needed
     if (get(map, Map, size) >= get(map, Map, capacity)) {
-        printf("expanding, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
         size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
         set(map, Map, elements, memcheck(realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity)));
         set(map, Map, capacity, newCapacity);
-        printf("expanded, size:%zu, capacity:%zu\n", get(map, Map, size), get(map, Map, capacity));
     }
 
     // insert
-    printf("before memmove\n");
-    memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * get(map, Map, size) - pos);
+    memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * (get(map, Map, size) - pos));
     // Maybe this syntax is not very nice and I should access the Pair stuff differently?
     // I mean modifying something on a line that begin with "get"... :/
     get(map, Map, elements)[pos].value = value;
@@ -250,7 +246,7 @@ oop map_del(oop map, oop key)
     ssize_t pos = map_search(map, key);
     if (pos < 0)    return map;
     if (pos < get(map, Map, size) - 1) {
-        memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * get(map, Map, size) - pos);
+        memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * (get(map, Map, size) - pos));
     }
     set(map, Map, size, --get(map, Map, size));
     return map;
