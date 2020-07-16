@@ -16,7 +16,8 @@
 
 #include "object.c"
 
-//oop globals;
+// this is the global scope
+oop globals;
 
 // this should stay out of object.c because it manipulates Symbol members defined in this file
 
@@ -59,7 +60,7 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |   PLUS  n:prefix              { $$ = n }
         |         n:postfix             { $$ = n }
 
-postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
+postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern(globals, "this"), i);  i = apply(map_get(i, s), p) }
                     | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
                     | p:parameterList                           { i = apply(i, p) }
@@ -84,7 +85,7 @@ string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
         |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = makeString(yytext) }
 
 symbol  =   HASH    ( i:IDENT                   { $$ = i }
-                    | i:string                  { $$ = intern(get(i, String, value)) }
+                    | i:string                  { $$ = intern(globals, get(i, String, value)) }
                     )
 
 map     =   LCB   m:makeMap
@@ -99,7 +100,7 @@ makeMap =   { $$ = makeMap() }
 -       =   [ \t\n\r]*
         | "//"  ( ![\n\r] . )*
 
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
+IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(globals, yytext) }
 NUMBER	=	< [0-9]+ >	-                   { $$ = makeInteger(atoi(yytext)) }
 HASH	=	'#'			-
 PLUS	=	'+'			-
@@ -135,7 +136,7 @@ int main(int argc, char **argv)
 {
     globals = makeMap();
 
-    set(intern("exit"), Symbol, value, makeFunction(prim_exit)); // map_set(globals, intern("exit"), makeFunction(prim_exit));
+    set(intern(globals, "exit"), Symbol, value, makeFunction(prim_exit)); // map_set(globals, intern("exit"), makeFunction(prim_exit));
 
     while (yyparse()) {
         println(yylval);

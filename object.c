@@ -194,7 +194,7 @@ oop map_get(oop map, oop key)
     return get(map, Map, elements)[pos].value;
 }
 
-#define MAP_CHUNK_SIZE 4
+#define MAP_CHUNK_SIZE 8
 
 oop map_insert(oop map, oop key, oop value, size_t pos)
 {
@@ -301,17 +301,14 @@ void println(oop ast)
     printf("\n");
 }
 
-oop globals;
-
-oop intern(char *ident)
+oop intern(oop scope, char *ident)
 {
+    assert(is(Map, scope));
     oop symbol = makeSymbol(memcheck(strdup(ident)));
-    ssize_t pos = map_search(globals, symbol);
-    if (pos >= 0)   {
-        return get(globals, Map, elements)[pos].key; // So it this case symbol will be garbage collected right?
-    }
+    ssize_t pos = map_search(scope, symbol);
+    if (pos >= 0) return get(scope, Map, elements)[pos].key; // So it this case, symbol will be garbage collected right?
     pos = -1 - pos; // 'un-negate' the result by reflecting it around X=-1
-    map_insert(globals, symbol, null, pos);
+    map_insert(scope, symbol, null, pos);
     return symbol;
 }
  

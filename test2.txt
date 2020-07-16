@@ -66,6 +66,6 @@ sys.id = "i am sys obj"
 "checkpoint 10"
 sys.bye = exit
 
-"checkpoint 10"
+"checkpoint 11"
 
 sys.bye(1,2,3)
