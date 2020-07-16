@@ -7,21 +7,28 @@
  */
 
 #define SYMBOL_PAYLOAD			\
-	oop     value;				\
-	int     defined
+    oop     value;				\
+    int     defined
 
 #define SYMBOL_INITIALISE(S)	\
-	S.value = null;				\
-	S.defined = false
+    S.value = null;				\
+    S.defined = false
 
 #include "object.c"
+
+oop globals;
 
 // this should stay out of object.c because it manipulates Symbol members defined in this file
 
 oop update_symbol_value(oop symbol, oop integer)
 {
-	set(symbol, Symbol, value, integer);
-	return symbol;
+    set(symbol, Symbol, value, integer);
+    return symbol;
+}
+
+oop apply(oop function, oop parameters)
+{
+    return get(function, Function, primitive)(parameters);
 }
 
 #define YYSTYPE oop
@@ -30,65 +37,72 @@ YYSTYPE yylval;
 
 %}
 
-start	=	e:exp					{ yylval = e }
+start   = - e:exp               { yylval = e }
 
-exp		=	- (a:assign				{ $$ = a }
-			| d:delete				{ $$ = d }
-			| p:prim 				{ $$ = p }
-			)
-
-assign	=	l:IDENT EQUAL p:prim	{ $$ = update_symbol_value(l, p) }
-
-# it is really unhappy that I have to repeate the code in value because
-# I need both information: map identifier and the key
-delete	=	DEL 
-			(	i:IDENT DOT p:STRING
-			|	i:IDENT LBRAC p:prim RBRAC
-			)						{ $$ = map_del(get(i, Symbol, value), p) }
-
-prim	=	( s:sum					{ $$ = s } 
-			| s:string 				{ $$ = s }
-			| m:map					{ $$ = m }
-			)
-
-# Map
-map		=	LCB RCB					{ $$ = makeMap() }
-		|	LCB p:prop RCB			{ $$ = p; }
-
-prop	=	k:STRING COLON v:prim COMMA p:prop				{ $$ = map_set(p, k, v) }
-		|	k:STRING COLON v:prim							{ $$ = map_set(makeMap(), k, v) }
-
-# String
-string	=	(SQUOTE | DQUOTE) s:STRING (SQUOTE | DQUOTE)	{ $$ = s }
+exp     =   l:IDENT                             EQUAL p:exp	{ $$ = update_symbol_value(l, p) }
+            |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
+            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
+            |   s:sum                                       { $$ = s }
 
 # Number
-sum		=	l:prod
-			( PLUS+ r:prod			{ get(l, Integer, value) += get(r, Integer, value) }
-			| MINUS r:prod			{ get(l, Integer, value) -= get(r, Integer, value) }
-			)*						{ $$ = l }
+sum     =   l:prod
+            ( PLUS+ r:prod          { get(l, Integer, value) += get(r, Integer, value) }
+            | MINUS r:prod          { get(l, Integer, value) -= get(r, Integer, value) }
+            )*                      { $$ = l }
 
-prod	=	l:sign
-			( MULTI		r:sign		{ get(l, Integer, value) *= get(r, Integer, value) }
-			| DIVIDE	r:sign		{ get(l, Integer, value) /= get(r, Integer, value) }
-			| MODULO	r:sign		{ get(l, Integer, value) %= get(r, Integer, value) }
-			)*						{ $$ = l }
+prod    =   l:prefix
+            ( MULTI     r:prefix        { get(l, Integer, value) *= get(r, Integer, value) }
+            | DIVIDE    r:prefix        { get(l, Integer, value) /= get(r, Integer, value) }
+            | MODULO    r:prefix        { get(l, Integer, value) %= get(r, Integer, value) }
+            )*                          { $$ = l }
 
-sign	=	MINUS n:sign			{ set(n, Integer, value, -get(n, Integer, value));  $$ = n }
-		|	PLUS  n:sign			{ $$ = n }
-		|	n:value					{ $$ = n }
+prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer, value));  $$ = n }
+        |   PLUS  n:prefix              { $$ = n }
+        |         n:postfix             { $$ = n }
 
-value	=	n:NUMBER				{ $$ = n }
-		|	NULL					{ $$ = null }
-		|	i:IDENT DOT s:STRING	{ $$ = map_get(get(i, Symbol, value), s) }
-# Here between the [ ] I put an exp but the only possible type is String so it is pretty limited
-# And I might directly write "prim"?
-		|	i:IDENT LBRAC p:exp RBRAC	{ $$ = map_get(get(i, Symbol, value), p) }
-		|	i:IDENT					{ $$ = get(i, Symbol, value) }
+postfix =	i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
+                    | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
+                    | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
+                    | p:parameterList		                    { i = apply(i, p) }
+                    ) *                                         { $$ = i }
 
--		=	[ \t\n\r]*
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = intern(yytext) }
-STRING	=	< [a-zA-Z][a-zA-Z0-9_]* >	-	{ $$ = makeString(yytext) }
-NUMBER	=	< [0-9]+ >	-					{ $$ = makeInteger(atoi(yytext)) }
+parameterList = LPAREN  m:makeMap
+                ( e:exp             { map_append(m, e) }
+                    ( COMMA e:exp   { map_append(m, e) }
+                    ) *
+                ) ?
+                RPAREN              { $$ = m }
+
+value   =   n:NUMBER                { $$ = n }
+        |   s:string                { $$ = s }
+        |   s:symbol                { $$ = s }
+        |   m:map                   { $$ = m }
+        |   NULL                    { $$ = null }
+        |   i:IDENT                 { $$ = get(i, Symbol, value) }
+        |   LPAREN i:exp RPAREN     { $$ = i }
+
+string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
+        |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = makeString(yytext) }
+
+symbol  =   HASH    ( i:IDENT                   { $$ = i }
+                    | i:string                  { $$ = intern(get(i, String, value)) }
+                    )
+
+map     =   LCB   m:makeMap
+            (           k:IDENT COLON v:exp     { map_set(m, k, v) }
+                ( COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
+                ) *
+            ) ?
+            RCB                                 { $$ = m }
+
+makeMap =   { $$ = makeMap() }
+
+-       =   [ \t\n\r]*
+        | "//"  ( ![\n\r] . )*
+
+IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
+NUMBER	=	< [0-9]+ >	-                   { $$ = makeInteger(atoi(yytext)) }
+HASH	=	'#'			-
 PLUS	=	'+'			-
 MINUS	=	'-'			-
 MULTI	=	'*'			-
@@ -96,7 +110,6 @@ DIVIDE	=	'/'			-
 MODULO	=	'%'			-
 EQUAL	=	'='			-
 NULL	=	'null'		-
-DEL		=	'del'		-
 COLON	=	':'			-
 COMMA	=	','			-
 DOT		=	'.'			-
@@ -104,16 +117,32 @@ LCB		=	'{'			-
 RCB		=	'}'			-
 LBRAC	=	'['			-
 RBRAC	=	']'			-
+LPAREN	=	'('			-
+RPAREN	=	')'			-
 DQUOTE	=	'"'			-
 SQUOTE	=	"'"			-
 
 %%
+;
+
+oop prim_exit(oop params)
+{
+    printf("bye bye with params ");
+    println(params);
+    exit(0);
+}
 
 int main(int argc, char **argv)
 {
-	while (yyparse()) {
-		println(yylval);
-	}
+        // globals = makeMap();
 
-	return 0;
+    set(intern("exit"), Symbol, value, makeFunction(prim_exit)); // map_set(globals, intern("exit"), makeFunction(prim_exit));
+
+    while (yyparse()) {
+        println(yylval);
+    }
+
+    return 0;
+
+    (void)yyAccept;
 }

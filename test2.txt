@@ -1,0 +1,65 @@
+"hello"
+#"foo"
+#"***"
+42
+3+4
+s = "abc"
+s
+o = {}
+o
+o
+o.x = 42
+o.x
+
+"checkpoint 1"
+
+{ prop1 : 12+2 }
+
+"checkpoint 2"
+
+{ prop1 : 12+2 }.prop1
+
+"checkpoint 3"
+
+myObj = { prop1: 12+2, prop2: { subProp1: "hey", subProp2: --12 } }
+myStr = "prop1"
+myObj[myStr]
+mySym = #prop1
+myObj[mySym]
+
+"checkpoint 4"
+
+myObj.prop2.subProp1
+
+myObj.undefinedProp
+myObj[#undeinedProp]
+
+myObj.foo = 123
+myObj.prop2.subProp2
+
+myObj.prop2.subProp2 = 42
+myObj.prop2.subProp2
+
+"checkpoint 5"
+
+myObj[42]
+myObj[42]=666
+
+"checkpoint 6"
+
+myObj[42] = 666
+
+"checkpoint 7"
+
+myObj[42]
+
+exit
+
+
+
+sys = {}
+sys.id = "i am sys obj"
+
+sys.bye = exit
+
+sys.bye(1,2,3)
