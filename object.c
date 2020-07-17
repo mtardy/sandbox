@@ -188,7 +188,7 @@ ssize_t map_search(oop map, oop key)
 oop map_get(oop map, oop key)
 {
     assert(is(Map, map));
-    //assert(is(String, key));
+    assert(key);
     ssize_t pos = map_search(map, key);
     if (pos < 0)    return null;
     return get(map, Map, elements)[pos].value;
