@@ -6,26 +6,12 @@
  * run:		( echo a=2*3; echo b=3+4; echo c=a*b ) | ./calc
  */
 
-#define SYMBOL_PAYLOAD			\
-    oop     value;				\
-    int     defined
-
-#define SYMBOL_INITIALISE(S)	\
-    S.value = null;				\
-    S.defined = false
-
 #include "object.c"
 
 // this is the global scope
-oop globals;
+// oop globals;
 
 // this should stay out of object.c because it manipulates Symbol members defined in this file
-
-oop update_symbol_value(oop symbol, oop integer)
-{
-    set(symbol, Symbol, value, integer);
-    return symbol;
-}
 
 oop apply(oop function, oop parameters)
 {
@@ -40,7 +26,7 @@ YYSTYPE yylval;
 
 start   = - e:exp               { yylval = e }
 
-exp     =   l:IDENT                             EQUAL p:exp	{ $$ = update_symbol_value(l, p) }
+exp     =   l:IDENT                             EQUAL p:exp	{ $$ = variableSet(l, p) }
             |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   s:sum                                       { $$ = s }
@@ -78,7 +64,7 @@ value   =   n:NUMBER                { $$ = n }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = m }
         |   NULL                    { $$ = null }
-        |   i:IDENT                 { $$ = get(i, Symbol, value) }
+        |   i:IDENT                 { $$ = variableGet(i) }
         |   LPAREN i:exp RPAREN     { $$ = i }
 
 string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
@@ -136,7 +122,8 @@ int main(int argc, char **argv)
 {
     globals = makeMap();
 
-    set(intern(globals, "exit"), Symbol, value, makeFunction(prim_exit)); // map_set(globals, intern("exit"), makeFunction(prim_exit));
+    variableSet(intern(globals, "exit"), makeFunction(prim_exit));
+    // map_set(globals, intern("exit"), makeFunction(prim_exit));
 
     while (yyparse()) {
         println(yylval);

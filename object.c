@@ -37,12 +37,11 @@ struct String {
 struct Symbol {
     type_t type;
     char *name;
-#if defined(SYMBOL_PAYLOAD)
-    SYMBOL_PAYLOAD;
-#endif // defined(SYMBOL_PAYLOAD)
 };
 
 typedef oop (*primitive_t)(oop params);
+
+oop globals;
 
 struct Function {
     type_t type;
@@ -131,9 +130,6 @@ oop makeSymbol(char *name)
     oop newSymb = memcheck(malloc(sizeof(union object)));
     newSymb->type = Symbol;
     newSymb->Symbol.name = name;
-#if defined(SYMBOL_INITIALISE)
-    SYMBOL_INITIALISE(newSymb->Symbol);
-#endif // defined(SYMBOL_INITIALISE)
     return newSymb;
 }
 
@@ -183,6 +179,13 @@ ssize_t map_search(oop map, oop key)
         else                    return mid; // non-negative result => element found at this index
     }
     return -1 - l; // negative result => 'not found', reflected around -1 instead of 0 to allow 'not found' at index 0
+}
+
+bool map_hasKey(oop map, oop key)
+{
+    assert(is(Map, map));
+    assert(key);
+    return map_search >= 0;
 }
 
 oop map_get(oop map, oop key)
@@ -257,6 +260,26 @@ oop map_append(oop map, oop value)
     return map_set(map, makeInteger(get(map, Map, size)), value);
 }
 
+bool variableIsDefined(oop aSymbol)
+{
+    assert(is(Symbol, aSymbol));
+    return map_hasKey(globals, aSymbol);
+}
+
+oop variableSet(oop aSymbol, oop value)
+{
+    assert(is(Symbol, aSymbol));
+    assert(value);
+    map_set(globals, aSymbol, value);
+    return value;
+}
+
+oop variableGet(oop aSymbol)
+{
+    assert(is(Symbol, aSymbol));
+    return map_get(globals, aSymbol);
+}
+
 void print(oop ast)
 {
     assert(ast);
@@ -271,8 +294,7 @@ void print(oop ast)
         printf("'%s'", get(ast, String, value));
         return;
     case Symbol:
-        printf("%s=", get(ast, Symbol, name));
-        print(get(ast, Symbol, value));
+        printf("%s", get(ast, Symbol, name));
         return;
     case Function:
         printf("Function@%p", get(ast, Function, primitive));
