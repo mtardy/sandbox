@@ -18,10 +18,22 @@ $ brew install bdw-gc
 $ make
 ```
 
+## Docker
+
+The Docker image provides a ready to go environment to experiment with the project. Just build the image locally and run an interactive shell inside the container:
+```bash
+$ docker build . --tag mtardy/javascrypt
+$ docker run -it mtardy/javascrypt
+```
+
 ## Usage
 
 ```bash
 $ echo "a=2+3 a*2" | ./calc
+```
+or
+```bash
+$ ./calc < file
 ```
 
 ## Tests
