@@ -43,10 +43,10 @@ $ ./calc < file
 
 Simple tests:
 ```bash
-$ ./test.sh
+$ tests/test.sh
 ```
 
 Custom test:
 ```bash
-$ ./calc < test.txt
+$ ./calc < tests/test.txt
 ```
