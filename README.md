@@ -1,8 +1,9 @@
 # Javascrypt
 
-## Requirements
+## Build the project
+### Requirements
 
-Please install [peg/leg](https://www.piumarta.com/software/peg/) manually or with Homebrew:
+Please install [peg/leg](https://www.piumarta.com/software/peg/) manually or with Homebrew: 
 ```bash
 $ brew install peg
 ```
@@ -12,19 +13,21 @@ Please install [the Boehm-Demers-Weiser conservative garbage collector](https://
 $ brew install bdw-gc
 ```
 
-## Build
+### Build
 
 ```bash
 $ make
 ```
 
-## Docker
+## Build with Docker
 
 The Docker image provides a ready to go environment to experiment with the project. Just build the image locally and run an interactive shell inside the container:
 ```bash
 $ docker build . --tag mtardy/javascrypt
 $ docker run -it mtardy/javascrypt
 ```
+
+---
 
 ## Usage
 
