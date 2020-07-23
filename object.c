@@ -41,7 +41,6 @@ struct Symbol {
 
 typedef oop (*primitive_t)(oop params);
 
-oop globals;
 
 struct Function {
     type_t type;
@@ -158,7 +157,7 @@ int oopcmp(oop a, oop b)
         case String:
             return strcmp(get(a, String, value), get(b, String, value));
         case Symbol:
-            return strcmp(get(a, Symbol, name), get(b, Symbol, name));
+            return a - b;
         default:
             return (intptr_t)a - (intptr_t)b;
         }
@@ -260,26 +259,6 @@ oop map_append(oop map, oop value)
     return map_set(map, makeInteger(get(map, Map, size)), value);
 }
 
-bool variableIsDefined(oop aSymbol)
-{
-    assert(is(Symbol, aSymbol));
-    return map_hasKey(globals, aSymbol);
-}
-
-oop variableSet(oop aSymbol, oop value)
-{
-    assert(is(Symbol, aSymbol));
-    assert(value);
-    map_set(globals, aSymbol, value);
-    return value;
-}
-
-oop variableGet(oop aSymbol)
-{
-    assert(is(Symbol, aSymbol));
-    return map_get(globals, aSymbol);
-}
-
 void print(oop ast)
 {
     assert(ast);
@@ -323,14 +302,31 @@ void println(oop ast)
     printf("\n");
 }
 
-oop intern(oop scope, char *ident)
+oop symbol_table;
+
+ssize_t map_intern_search(oop map, char* ident)
 {
-    assert(is(Map, scope));
-    oop symbol = makeSymbol(memcheck(strdup(ident)));
-    ssize_t pos = map_search(scope, symbol);
-    if (pos >= 0) return get(scope, Map, elements)[pos].key; // So it this case, symbol will be garbage collected right?
+    assert(is(Map, map));
+    assert(ident);
+    ssize_t l = 0, r = get(map, Map, size) - 1;
+    while (l <= r) {
+        ssize_t mid = (l + r) / 2;
+        int cmpres = strcmp(get(get(map, Map, elements)[mid].key, Symbol, name), ident);
+        if (cmpres > 0)         r = mid - 1;
+        else if (cmpres < 0)    l = mid + 1;
+        else                    return mid; // non-negative result => element found at this index
+    }
+    return -1 - l; // negative result => 'not found', reflected around -1 instead of 0 to allow 'not found' at index 0
+}
+
+oop intern(char *ident)
+{
+    assert(ident);
+    ssize_t pos = map_intern_search(symbol_table, ident);
+    if (pos >= 0) return get(symbol_table, Map, elements)[pos].key;
     pos = -1 - pos; // 'un-negate' the result by reflecting it around X=-1
-    map_insert(scope, symbol, null, pos);
+    oop symbol = makeSymbol(memcheck(strdup(ident)));
+    map_insert(symbol_table, symbol, null, pos);
     return symbol;
 }
  

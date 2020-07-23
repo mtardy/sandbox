@@ -9,9 +9,7 @@
 #include "object.c"
 
 // this is the global scope
-// oop globals;
-
-// this should stay out of object.c because it manipulates Symbol members defined in this file
+oop globals;
 
 oop apply(oop function, oop parameters)
 {
@@ -26,7 +24,7 @@ YYSTYPE yylval;
 
 start   = - e:exp               { yylval = e }
 
-exp     =   l:IDENT                             EQUAL p:exp	{ $$ = variableSet(l, p) }
+exp     =   l:IDENT                             EQUAL p:exp	{ $$ = map_set(globals, l, p) }
             |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   s:sum                                       { $$ = s }
@@ -46,7 +44,7 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |   PLUS  n:prefix              { $$ = n }
         |         n:postfix             { $$ = n }
 
-postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern(globals, "this"), i);  i = apply(map_get(i, s), p) }
+postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
                     | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
                     | p:parameterList                           { i = apply(i, p) }
@@ -64,14 +62,14 @@ value   =   n:NUMBER                { $$ = n }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = m }
         |   NULL                    { $$ = null }
-        |   i:IDENT                 { $$ = variableGet(i) }
+        |   i:IDENT                 { $$ = map_get(globals, i) }
         |   LPAREN i:exp RPAREN     { $$ = i }
 
 string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
         |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = makeString(yytext) }
 
 symbol  =   HASH    ( i:IDENT                   { $$ = i }
-                    | i:string                  { $$ = intern(globals, get(i, String, value)) }
+                    | i:string                  { $$ = intern(get(i, String, value)) }
                     )
 
 map     =   LCB   m:makeMap
@@ -86,7 +84,7 @@ makeMap =   { $$ = makeMap() }
 -       =   [ \t\n\r]*
         | "//"  ( ![\n\r] . )*
 
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(globals, yytext) }
+IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 NUMBER	=	< [0-9]+ >	-                   { $$ = makeInteger(atoi(yytext)) }
 HASH	=	'#'			-
 PLUS	=	'+'			-
@@ -120,10 +118,10 @@ oop prim_exit(oop params)
 
 int main(int argc, char **argv)
 {
+    symbol_table = makeMap();
     globals = makeMap();
 
-    variableSet(intern(globals, "exit"), makeFunction(prim_exit));
-    // map_set(globals, intern("exit"), makeFunction(prim_exit));
+    map_set(globals, intern("exit"), makeFunction(prim_exit));
 
     while (yyparse()) {
         println(yylval);
