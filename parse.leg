@@ -1,0 +1,236 @@
+%{
+
+/* compile:	leg -o parse.c parse.leg
+ *		cc -o parse parse.c
+ *
+ * run:		echo "3+4"  | ./parse
+ */
+
+#include "object.c"
+
+// this is the global scope
+oop globals;
+
+oop apply(oop function, oop parameters)
+{
+    return get(function, Function, primitive)(parameters);
+}
+
+#define YYSTYPE oop
+
+YYSTYPE yylval;
+
+%}
+
+start   = - e:exp               { yylval = e }
+
+exp     =   l:IDENT                             EQUAL p:exp	{ $$ = map_set(globals, l, p) }
+            |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
+            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
+            |   s:sum                                       { $$ = s }
+
+sum     =   l:prod
+            ( PLUS+ r:prod          { get(l, Integer, value) += get(r, Integer, value) }
+            | MINUS r:prod          { get(l, Integer, value) -= get(r, Integer, value) }
+            )*                      { $$ = l }
+
+prod    =   l:prefix
+            ( MULTI     r:prefix        { get(l, Integer, value) *= get(r, Integer, value) }
+            | DIVIDE    r:prefix        { get(l, Integer, value) /= get(r, Integer, value) }
+            | MODULO    r:prefix        { get(l, Integer, value) %= get(r, Integer, value) }
+            )*                          { $$ = l }
+
+prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer, value));  $$ = n }
+        |   PLUS  n:prefix              { $$ = n }
+        |         n:postfix             { $$ = n }
+
+postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
+                    | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
+                    | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
+                    | p:parameterList                           { i = apply(i, p) }
+                    ) *                                         { $$ = i }
+
+parameterList = LPAREN  m:makeMap
+                ( e:exp             { map_append(m, e) }
+                ( COMMA e:exp       { map_append(m, e) }
+                ) *
+                ) ?
+                RPAREN              { $$ = m }
+
+value   =   n:NUMBER                { $$ = n }
+        |   s:string                { $$ = s }
+        |   s:symbol                { $$ = s }
+        |   m:map                   { $$ = m }
+        |   NULL                    { $$ = null }
+        |   i:IDENT                 { $$ = map_get(globals, i) }
+        |   LPAREN i:exp RPAREN     { $$ = i }
+
+string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
+        |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = makeString(yytext) }
+
+symbol  =   HASH    ( i:IDENT                   { $$ = i }
+                    | i:string                  { $$ = intern(get(i, String, value)) }
+                    )
+
+map     =   LCB   m:makeMap
+            (           k:IDENT COLON v:exp     { map_set(m, k, v) }
+            (     COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
+            ) *
+            ) ?
+            RCB                                 { $$ = m }
+
+makeMap =   { $$ = makeMap() }
+
+-       =   [ \t\n\r]*
+        | "//"  ( ![\n\r] . )*
+
+IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
+NUMBER	=	< [0-9]+ >	-                   { $$ = makeInteger(atoi(yytext)) }
+HASH	=	'#'			-
+PLUS	=	'+'			-
+MINUS	=	'-'			-
+MULTI	=	'*'			-
+DIVIDE	=	'/'			-
+MODULO	=	'%'			-
+EQUAL	=	'='			-
+NULL	=	'null'		-
+COLON	=	':'			-
+COMMA	=	','			-
+DOT		=	'.'			-
+LCB		=	'{'			-
+RCB		=	'}'			-
+LBRAC	=	'['			-
+RBRAC	=	']'			-
+LPAREN	=	'('			-
+RPAREN	=	')'			-
+DQUOTE	=	'"'			-
+SQUOTE	=	"'"			-
+
+%%
+;
+
+oop proto_symbol, name_symbol;
+
+oop integer_proto, add_proto;
+oop integer_symbol, add_symbol;
+
+oop value_symbol, lhs_symbol, rhs_symbol;
+
+oop newObject(oop proto)
+{
+    oop map = makeMap();
+    map_set(map, proto_symbol, proto);
+    return map;
+}
+
+void printObjectName(oop object)
+{
+    assert(is(Map, object));
+    oop name = map_get(object, name_symbol);
+    if (name != null) {
+        println(name);
+        return;
+    } 
+
+    oop proto = map_get(object, proto_symbol);
+    if (proto != null) {
+        printObjectName(proto);
+    } else {
+        fprintf(stderr, "\nThis map has no name\n");
+    }
+}
+
+// why use a macro instead of a regular function?
+oop newInteger(int value)
+{
+    oop integer = newObject(integer_proto);
+    map_set(integer, value_symbol, makeInteger(value));
+    return integer;
+}
+
+oop newAdd(oop lhs, oop rhs)
+{
+    oop add = newObject(add_proto);
+    map_set(add, lhs_symbol, lhs);
+    map_set(add, rhs_symbol, rhs);
+    return add;
+}
+
+// this always creates the key in "object"
+oop newMember(oop object, oop key, oop value)
+{
+    map_set(object, key, value);
+    return value;
+}
+
+// this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
+oop setMember(oop object, oop key, oop value)
+{
+    /*
+    assert(is(Map, object));
+    oop proto = object;
+
+    for (;;) {
+        ssize_t pos = map_search(object, key);
+        if (pos > 0) {
+            map_in
+        }
+        proto = map_get(object, proto_symbol);
+        if (proto == null) {
+            return newMember(object, key, value);
+        }
+    }
+    while (map_search(proto, key) < 0) {
+    }
+
+    do {
+        pos = map_search(object, key);
+        oop object = map_get(object, proto_symbol);
+        if (object == null) {
+            newMember()
+        }
+    } while (pos < 0);
+    */
+}
+
+
+int main(int argc, char **argv)
+{
+    symbol_table = makeMap();
+    globals = makeMap();
+
+    // Symbols
+    proto_symbol = intern("__proto__");
+    name_symbol = intern("__name__");
+    value_symbol = intern("value");
+    lhs_symbol = intern("lhs");
+    rhs_symbol = intern("rhs");
+
+    // Integer
+    integer_symbol = intern("Integer");
+    integer_proto = makeMap();
+    map_set(integer_proto, name_symbol, integer_symbol);
+    
+    // Addition
+    add_symbol = intern("Add");
+    add_proto = makeMap();
+    map_set(add_proto, name_symbol, add_symbol);
+
+
+
+    oop myInteger = newInteger(32);
+    println(myInteger);
+    oop myAddition = newAdd(myInteger, myInteger);
+    println(myAddition);
+
+    printObjectName(myAddition);
+    printObjectName(myInteger);
+
+    while (yyparse()) {
+        println(yylval);
+    }
+
+    return 0;
+
+    (void)yyAccept;
+}

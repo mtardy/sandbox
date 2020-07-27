@@ -259,6 +259,32 @@ oop map_append(oop map, oop value)
     return map_set(map, makeInteger(get(map, Map, size)), value);
 }
 
+void print(oop ast);
+
+void map_print(oop map, int ident)
+{
+    assert(is(Map, map));
+    if (ident > 1) {
+        printf("\n");
+    }
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+        for (size_t i = 0; i < ident; i++) {
+            printf("\t");
+        }
+        // todo: a key could be a map itself
+        print(get(map, Map, elements)[i].key);
+        printf(": ");
+        oop rhs = get(map, Map, elements)[i].value;
+        if (rhs->type == Map) {
+            map_print(rhs, ident + 1);
+        } else {
+            print(rhs);
+        }
+        if (i < get(map, Map, size) - 1) printf(",\n");
+    }
+    return;
+}
+
 void print(oop ast)
 {
     assert(ast);
@@ -279,6 +305,7 @@ void print(oop ast)
         printf("Function@%p", get(ast, Function, primitive));
         return;
     case Map:
+        /*
         printf("{");
         for (size_t i = 0; i < get(ast, Map, size); i++) {
             printf(" ");
@@ -291,6 +318,10 @@ void print(oop ast)
             else                                printf(" ");
         }
         printf("}");
+        */
+        printf("{\n");
+        map_print(ast, 1);
+        printf("\n}");
         return;
     }
     assert(0);

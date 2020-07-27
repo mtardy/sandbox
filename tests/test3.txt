@@ -1,6 +1,0 @@
-s = {}
-chaussure = "parfois"
-#manger
-manger
-s.pizza = "ok"
-s

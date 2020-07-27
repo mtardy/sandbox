@@ -5,6 +5,9 @@
 calc.c
 calc
 calc.dSYM/
+parse.c
+parse
+parse.dSYM/
 NOTES.txt
 a.out
 

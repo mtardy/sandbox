@@ -1,0 +1,5 @@
+s = {}
+s.pizza = "ok"
+s.pizza
+s.inside = {}
+s.inside.pizza = "no"
