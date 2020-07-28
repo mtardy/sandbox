@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(integer) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
+#define DO_PROTOS() _DO(integer) _DO(string) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -27,7 +27,7 @@ oop apply(oop function, oop parameters)
     return get(function, Function, primitive)(parameters);
 }
 
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs)
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs) _DO(length)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -66,6 +66,15 @@ oop newInteger(int value)
     oop integer = newObject(integer_proto);
     map_set(integer, value_symbol, makeInteger(value));
     return integer;
+}
+
+oop newString(char *value)
+{
+    oop string = newObject(string_proto);
+    oop primitive_string = makeString(value);
+    map_set(string, value_symbol, primitive_string);
+    map_set(string, length_symbol, makeInteger(get(primitive_string, String, size)));
+    return string;
 }
 
 oop newBinary(oop proto, oop lhs, oop rhs)
@@ -165,8 +174,8 @@ value   =   n:NUMBER                { $$ = n }
         |   i:IDENT                 { $$ = map_get(globals, i) }
         |   LPAREN i:exp RPAREN     { $$ = i }
 
-string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = makeString(yytext) }
-        |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = makeString(yytext) }
+string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = newString(yytext) }
+        |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = newString(yytext) }
 
 symbol  =   HASH    ( i:IDENT                   { $$ = i }
                     | i:string                  { $$ = intern(get(i, String, value)) }
@@ -221,6 +230,10 @@ oop eval(oop ast)
     proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
     switch (proto_number) {
     case t_integer: {
+        return map_get(ast, value_symbol);
+        break;
+    }
+    case t_string: {
         return map_get(ast, value_symbol);
         break;
     }
