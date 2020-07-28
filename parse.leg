@@ -6,6 +6,17 @@
  * run:		echo "3+4"  | ./parse
  */
 
+#define DO_PROTOS() _DO(integer) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
+
+typedef enum {
+t_UNDEFINED=0,
+#define _DO(NAME) t_##NAME,
+DO_PROTOS()
+#undef _DO
+} proto_t;
+
+#define SYMBOL_PAYLOAD proto_t prototype;
+
 #include "object.c"
 
 // this is the global scope
@@ -14,6 +25,95 @@ oop globals;
 oop apply(oop function, oop parameters)
 {
     return get(function, Function, primitive)(parameters);
+}
+
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs)
+
+#define _DO(NAME) oop NAME##_symbol;
+DO_SYMBOLS()
+#undef _DO
+
+#define _DO(NAME) oop NAME##_proto;
+DO_PROTOS()
+#undef _DO
+
+oop newObject(oop proto)
+{
+    oop map = makeMap();
+    map_set(map, __proto___symbol, proto);
+    return map;
+}
+
+void printObjectName(oop object)
+{
+    assert(is(Map, object));
+    oop name = map_get(object, __name___symbol);
+    if (name != null) {
+        println(name);
+        return;
+    }
+
+    oop proto = map_get(object, __proto___symbol);
+    if (proto != null) {
+        printObjectName(proto);
+    } else {
+        fprintf(stderr, "\nThis map has no name\n");
+    }
+}
+
+oop newInteger(int value)
+{
+    oop integer = newObject(integer_proto);
+    map_set(integer, value_symbol, makeInteger(value));
+    return integer;
+}
+
+oop newBinary(oop proto, oop lhs, oop rhs)
+{
+    oop parent = newObject(proto);
+    map_set(parent, __name___symbol, binary_symbol);
+    oop obj = newObject(parent);
+    map_set(obj, lhs_symbol, lhs);
+    map_set(obj, rhs_symbol, rhs);
+    return obj;
+}
+
+// this always creates the key in "object"
+oop newMember(oop object, oop key, oop value)
+{
+    map_set(object, key, value);
+    return value;
+}
+
+// this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
+oop setMember(oop object, oop key, oop value)
+{
+    /*
+    assert(is(Map, object));
+    oop proto = object;
+
+    for (;;) {
+        ssize_t pos = map_search(object, key);
+        if (pos > 0) {
+            map_in
+        }
+        proto = map_get(object, __proto___symbol);
+        if (proto == null) {
+            return newMember(object, key, value);
+        }
+    }
+    while (map_search(proto, key) < 0) {
+    }
+
+    do {
+        pos = map_search(object, key);
+        oop object = map_get(object, __proto___symbol);
+        if (object == null) {
+            newMember()
+        }
+    } while (pos < 0);
+    */
+   return null;
 }
 
 #define YYSTYPE oop
@@ -30,14 +130,14 @@ exp     =   l:IDENT                             EQUAL p:exp	{ $$ = map_set(globa
             |   s:sum                                       { $$ = s }
 
 sum     =   l:prod
-            ( PLUS+ r:prod          { get(l, Integer, value) += get(r, Integer, value) }
-            | MINUS r:prod          { get(l, Integer, value) -= get(r, Integer, value) }
+            ( PLUS+ r:prod          { l = newBinary(add_proto, l, r) }
+            | MINUS r:prod          { l = newBinary(sub_proto, l, r) }
             )*                      { $$ = l }
 
 prod    =   l:prefix
-            ( MULTI     r:prefix        { get(l, Integer, value) *= get(r, Integer, value) }
-            | DIVIDE    r:prefix        { get(l, Integer, value) /= get(r, Integer, value) }
-            | MODULO    r:prefix        { get(l, Integer, value) %= get(r, Integer, value) }
+            ( MULTI     r:prefix        { l = newBinary(mul_proto, l, r) }
+            | DIVIDE    r:prefix        { l = newBinary(div_proto, l, r) }
+            | MODULO    r:prefix        { l = newBinary(mod_proto, l, r) }
             )*                          { $$ = l }
 
 prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer, value));  $$ = n }
@@ -85,7 +185,7 @@ makeMap =   { $$ = makeMap() }
         | "//"  ( ![\n\r] . )*
 
 IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
-NUMBER	=	< [0-9]+ >	-                   { $$ = makeInteger(atoi(yytext)) }
+NUMBER	=	< [0-9]+ >	-                   { $$ = newInteger(atoi(yytext)) }
 HASH	=	'#'			-
 PLUS	=	'+'			-
 MINUS	=	'-'			-
@@ -109,118 +209,83 @@ SQUOTE	=	"'"			-
 %%
 ;
 
-oop proto_symbol, name_symbol;
-
-oop integer_proto, add_proto;
-oop integer_symbol, add_symbol;
-
-oop value_symbol, lhs_symbol, rhs_symbol;
-
-oop newObject(oop proto)
+int getInteger(oop obj)
 {
-    oop map = makeMap();
-    map_set(map, proto_symbol, proto);
-    return map;
+    return get(obj, Integer, value);
 }
 
-void printObjectName(oop object)
+oop eval(oop ast)
 {
-    assert(is(Map, object));
-    oop name = map_get(object, name_symbol);
-    if (name != null) {
-        println(name);
-        return;
-    } 
-
-    oop proto = map_get(object, proto_symbol);
-    if (proto != null) {
-        printObjectName(proto);
-    } else {
-        fprintf(stderr, "\nThis map has no name\n");
+    oop proto = map_get(ast, __proto___symbol);
+    // proto_number is the enum version of the proto symbol
+    proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
+    switch (proto_number) {
+    case t_integer: {
+        return map_get(ast, value_symbol);
+        break;
     }
-}
-
-// why use a macro instead of a regular function?
-oop newInteger(int value)
-{
-    oop integer = newObject(integer_proto);
-    map_set(integer, value_symbol, makeInteger(value));
-    return integer;
-}
-
-oop newAdd(oop lhs, oop rhs)
-{
-    oop add = newObject(add_proto);
-    map_set(add, lhs_symbol, lhs);
-    map_set(add, rhs_symbol, rhs);
-    return add;
-}
-
-// this always creates the key in "object"
-oop newMember(oop object, oop key, oop value)
-{
-    map_set(object, key, value);
-    return value;
-}
-
-// this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
-oop setMember(oop object, oop key, oop value)
-{
-    /*
-    assert(is(Map, object));
-    oop proto = object;
-
-    for (;;) {
-        ssize_t pos = map_search(object, key);
-        if (pos > 0) {
-            map_in
+    case t_binary: {
+        oop lhs = eval(map_get(ast, lhs_symbol));
+        oop rhs = eval(map_get(ast, rhs_symbol));
+        // this is not recursive because (it's not, haha) we want to keep lhs and rhs
+        proto_number = get(map_get(map_get(proto, __proto___symbol), __name___symbol), Symbol, prototype);
+        switch (proto_number) {
+        case t_add: {
+            return makeInteger(getInteger(lhs) + getInteger(rhs));
+            break;
         }
-        proto = map_get(object, proto_symbol);
-        if (proto == null) {
-            return newMember(object, key, value);
+        case t_sub: {
+            return makeInteger(getInteger(lhs) - getInteger(rhs));
+            break;
+        }
+        case t_mul: {
+            return makeInteger(getInteger(lhs) * getInteger(rhs));
+            break;
+        }
+        case t_div: {
+            return makeInteger(getInteger(lhs) / getInteger(rhs));
+            break;
+        }
+        case t_mod: {
+            return makeInteger(getInteger(lhs) % getInteger(rhs));
+            break;
+        }
+        default: {
+            assert(0);
+            break;
+        }
         }
     }
-    while (map_search(proto, key) < 0) {
+    default: {
+        assert(0);
+        break;
     }
-
-    do {
-        pos = map_search(object, key);
-        oop object = map_get(object, proto_symbol);
-        if (object == null) {
-            newMember()
-        }
-    } while (pos < 0);
-    */
+    }
+    return null;
 }
-
 
 int main(int argc, char **argv)
 {
     symbol_table = makeMap();
     globals = makeMap();
 
-    // Symbols
-    proto_symbol = intern("__proto__");
-    name_symbol = intern("__name__");
-    value_symbol = intern("value");
-    lhs_symbol = intern("lhs");
-    rhs_symbol = intern("rhs");
+    #define _DO(NAME) NAME##_symbol=intern(#NAME);
+    DO_SYMBOLS()
+    #undef _DO
 
-    // Integer
-    integer_symbol = intern("Integer");
-    integer_proto = makeMap();
-    map_set(integer_proto, name_symbol, integer_symbol);
-    
-    // Addition
-    add_symbol = intern("Add");
-    add_proto = makeMap();
-    map_set(add_proto, name_symbol, add_symbol);
+    #define _DO(NAME) set(NAME##_symbol, Symbol, prototype, t_##NAME);
+    DO_PROTOS()
+    #undef _DO
 
+    // instanciate protos with empty Map and fill their name
+    #define _DO(NAME) NAME##_proto=makeMap(); map_set(NAME##_proto, __name___symbol, NAME##_symbol);
+    DO_PROTOS()
+    #undef _DO
 
 
     oop myInteger = newInteger(32);
     println(myInteger);
-    oop myAddition = newAdd(myInteger, myInteger);
+    oop myAddition = newBinary(add_proto, myInteger, myInteger);
     println(myAddition);
 
     printObjectName(myAddition);
@@ -228,6 +293,7 @@ int main(int argc, char **argv)
 
     while (yyparse()) {
         println(yylval);
+        println(eval(yylval));
     }
 
     return 0;

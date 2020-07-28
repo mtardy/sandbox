@@ -37,6 +37,9 @@ struct String {
 struct Symbol {
     type_t type;
     char *name;
+    #ifdef SYMBOL_PAYLOAD
+    SYMBOL_PAYLOAD
+    #endif //SYMBOL_PAYLOAD
 };
 
 typedef oop (*primitive_t)(oop params);
@@ -129,6 +132,7 @@ oop makeSymbol(char *name)
     oop newSymb = memcheck(malloc(sizeof(union object)));
     newSymb->type = Symbol;
     newSymb->Symbol.name = name;
+    newSymb->Symbol.prototype = 0;
     return newSymb;
 }
 
@@ -269,7 +273,8 @@ void map_print(oop map, int ident)
     }
     for (size_t i = 0; i < get(map, Map, size); i++) {
         for (size_t i = 0; i < ident; i++) {
-            printf("\t");
+            printf("|");
+            printf("   ");
         }
         // todo: a key could be a map itself
         print(get(map, Map, elements)[i].key);
