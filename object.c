@@ -186,9 +186,10 @@ ssize_t map_search(oop map, oop key)
 
 bool map_hasKey(oop map, oop key)
 {
-    assert(is(Map, map));
-    assert(key);
-    return map_search >= 0;
+    // checks already done by map_search
+    //assert(is(Map, map));
+    //assert(key);
+    return map_search(map, key) >= 0;
 }
 
 oop map_get(oop map, oop key)
@@ -270,7 +271,7 @@ void map_print(oop map, int ident)
     assert(is(Map, map));
     if (ident > 1) {
         printf("\n");
-    }
+    } 
     for (size_t i = 0; i < get(map, Map, size); i++) {
         for (size_t i = 0; i < ident; i++) {
             printf("|");

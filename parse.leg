@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(integer) _DO(string) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
+#define DO_PROTOS() _DO(assign) _DO(read) _DO(symbol) _DO(integer) _DO(string) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -27,7 +27,7 @@ oop apply(oop function, oop parameters)
     return get(function, Function, primitive)(parameters);
 }
 
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs) _DO(length)
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(length)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -59,6 +59,32 @@ void printObjectName(oop object)
     } else {
         fprintf(stderr, "\nThis map has no name\n");
     }
+}
+
+oop newAssign(oop scope, oop lhs, oop rhs)
+{
+    oop assign = newObject(assign_proto);
+    map_set(assign, scope_symbol, scope);
+    map_set(assign, lhs_symbol, lhs);
+    map_set(assign, rhs_symbol, rhs);
+    return assign;
+}
+
+oop newRead(oop scope, oop obj)
+{
+    oop read = newObject(read_proto);
+    map_set(read, scope_symbol, scope);
+    map_set(read, value_symbol, obj);
+    return read;
+}
+
+// take char *name or oop already interned?
+oop newSymbol(oop name)
+{
+    oop symbol = newObject(symbol_proto);
+    // what is the less confusing, name or value? maybe another word like identifier?
+    map_set(symbol, value_symbol, name);
+    return symbol;
 }
 
 oop newInteger(int value)
@@ -94,35 +120,29 @@ oop newMember(oop object, oop key, oop value)
     return value;
 }
 
+// this looks in object and everything in the __proto__ chain until it finds the key
+oop getMember(oop object, oop key)
+{
+    while (!map_hasKey(object, key)) {
+        object = map_get(object, __proto___symbol);
+        if (object == null) {
+            return null;
+        }
+    }
+    return map_get(object, key);
+}
+
 // this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
 oop setMember(oop object, oop key, oop value)
 {
-    /*
-    assert(is(Map, object));
-    oop proto = object;
-
-    for (;;) {
-        ssize_t pos = map_search(object, key);
-        if (pos > 0) {
-            map_in
-        }
-        proto = map_get(object, __proto___symbol);
-        if (proto == null) {
-            return newMember(object, key, value);
-        }
-    }
-    while (map_search(proto, key) < 0) {
-    }
-
-    do {
-        pos = map_search(object, key);
-        oop object = map_get(object, __proto___symbol);
+    oop firstObject = object;
+    while (!map_hasKey(object, key)) {
+        object = map_get(object, __proto___symbol);
         if (object == null) {
-            newMember()
+            newMember(firstObject, key, value);
         }
-    } while (pos < 0);
-    */
-   return null;
+    }
+    return map_set(object, key, value);
 }
 
 #define YYSTYPE oop
@@ -133,7 +153,7 @@ YYSTYPE yylval;
 
 start   = - e:exp               { yylval = e }
 
-exp     =   l:IDENT                             EQUAL p:exp	{ $$ = map_set(globals, l, p) }
+exp     =   l:IDENT                             EQUAL p:exp	{ $$ = newAssign(globals, newSymbol(l), p) }
             |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
             |   s:sum                                       { $$ = s }
@@ -154,7 +174,7 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |         n:postfix             { $$ = n }
 
 postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
-                    | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
+                    | DOT    s:IDENT        !EQUAL              { i = newRead(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
                     | p:parameterList                           { i = apply(i, p) }
                     ) *                                         { $$ = i }
@@ -171,14 +191,14 @@ value   =   n:NUMBER                { $$ = n }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = m }
         |   NULL                    { $$ = null }
-        |   i:IDENT                 { $$ = map_get(globals, i) }
+        |   i:IDENT                 { $$ = newRead(globals, i) }
         |   LPAREN i:exp RPAREN     { $$ = i }
 
 string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = newString(yytext) }
         |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = newString(yytext) }
 
-symbol  =   HASH    ( i:IDENT                   { $$ = i }
-                    | i:string                  { $$ = intern(get(i, String, value)) }
+symbol  =   HASH    ( i:IDENT                   { $$ = newSymbol(i) }
+                    | i:string                  { $$ = newSymbol(intern(get(i, String, value))) }
                     )
 
 map     =   LCB   m:makeMap
@@ -229,18 +249,30 @@ oop eval(oop ast)
     // proto_number is the enum version of the proto symbol
     proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
     switch (proto_number) {
+    case t_assign: {
+        oop lhs = eval(map_get(ast, lhs_symbol));
+        oop rhs = map_get(ast, rhs_symbol);
+        oop scope = map_get(ast, scope_symbol);
+        // mmmmmmh
+        return eval(map_set(scope, lhs, rhs));
+    }
+    case t_read: {
+        oop scope = map_get(ast, scope_symbol);
+        // mmmmmmh
+        return eval(map_get(scope, map_get(ast, value_symbol)));
+    }
+    case t_symbol: {
+        return map_get(ast, value_symbol);
+    }
     case t_integer: {
         return map_get(ast, value_symbol);
-        break;
     }
     case t_string: {
         return map_get(ast, value_symbol);
-        break;
     }
     case t_binary: {
         oop lhs = eval(map_get(ast, lhs_symbol));
         oop rhs = eval(map_get(ast, rhs_symbol));
-        // this is not recursive because (it's not, haha) we want to keep lhs and rhs
         proto_number = get(map_get(map_get(proto, __proto___symbol), __name___symbol), Symbol, prototype);
         switch (proto_number) {
         case t_add: {
@@ -296,6 +328,7 @@ int main(int argc, char **argv)
     #undef _DO
 
 
+    /*
     oop myInteger = newInteger(32);
     println(myInteger);
     oop myAddition = newBinary(add_proto, myInteger, myInteger);
@@ -303,6 +336,17 @@ int main(int argc, char **argv)
 
     printObjectName(myAddition);
     printObjectName(myInteger);
+    */
+
+    oop myFirst = newObject(null);
+    oop myPizzaSymbol = makeSymbol("pizza");
+    map_set(myFirst, myPizzaSymbol, makeInteger(3));
+    oop mySecond = newObject(myFirst);
+    oop myThird = newObject(mySecond);
+    map_set(mySecond, myPizzaSymbol, makeInteger(4));
+    println(myThird);
+    println(getMember(mySecond, myPizzaSymbol));
+    
 
     while (yyparse()) {
         println(yylval);
