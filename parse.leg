@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(assign) _DO(read) _DO(symbol) _DO(integer) _DO(string) _DO(binary) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod)
+#define DO_PROTOS() _DO(map) _DO(declar) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(member)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -27,7 +27,7 @@ oop apply(oop function, oop parameters)
     return get(function, Function, primitive)(parameters);
 }
 
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(length)
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(value) _DO(lhs) _DO(rhs) _DO(scope)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -61,21 +61,25 @@ void printObjectName(oop object)
     }
 }
 
-oop newAssign(oop scope, oop lhs, oop rhs)
+oop newMap()
+{
+    oop map = newObject(map_proto);
+    return map;
+}
+
+oop newDeclar(oop value)
+{
+    oop declar = newObject(declar_proto);
+    map_set(declar, value_symbol, value);
+    return declar;
+}
+
+oop newAssign(oop lhs, oop rhs)
 {
     oop assign = newObject(assign_proto);
-    map_set(assign, scope_symbol, scope);
     map_set(assign, lhs_symbol, lhs);
     map_set(assign, rhs_symbol, rhs);
     return assign;
-}
-
-oop newRead(oop scope, oop obj)
-{
-    oop read = newObject(read_proto);
-    map_set(read, scope_symbol, scope);
-    map_set(read, value_symbol, obj);
-    return read;
 }
 
 // take char *name or oop already interned?
@@ -99,29 +103,32 @@ oop newString(char *value)
     oop string = newObject(string_proto);
     oop primitive_string = makeString(value);
     map_set(string, value_symbol, primitive_string);
-    map_set(string, length_symbol, makeInteger(get(primitive_string, String, size)));
     return string;
 }
 
 oop newBinary(oop proto, oop lhs, oop rhs)
 {
-    oop parent = newObject(proto);
-    map_set(parent, __name___symbol, binary_symbol);
-    oop obj = newObject(parent);
+    oop obj = newObject(proto);
     map_set(obj, lhs_symbol, lhs);
     map_set(obj, rhs_symbol, rhs);
     return obj;
 }
 
+oop newMember(oop map, oop key)
+{
+    oop obj = newObject(member_proto);
+//    map_set(obj, )
+}
+
 // this always creates the key in "object"
-oop newMember(oop object, oop key, oop value)
+oop newVariable(oop object, oop key, oop value)
 {
     map_set(object, key, value);
     return value;
 }
 
 // this looks in object and everything in the __proto__ chain until it finds the key
-oop getMember(oop object, oop key)
+oop getVariable(oop object, oop key)
 {
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
@@ -133,13 +140,14 @@ oop getMember(oop object, oop key)
 }
 
 // this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
-oop setMember(oop object, oop key, oop value)
+oop setVariable(oop object, oop key, oop value)
 {
     oop firstObject = object;
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
         if (object == null) {
-            newMember(firstObject, key, value);
+            fprintf(stderr, "\nUndefined, %s\n", get(key, Symbol, name));
+            exit(1);
         }
     }
     return map_set(object, key, value);
@@ -153,9 +161,10 @@ YYSTYPE yylval;
 
 start   = - e:exp               { yylval = e }
 
-exp     =   l:IDENT                             EQUAL p:exp	{ $$ = newAssign(globals, newSymbol(l), p) }
-            |   l:postfix DOT   i:IDENT         EQUAL p:exp	{ $$ = map_set(l, i, p) }
-            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp	{ $$ = map_set(l, i, p) }
+exp     =   VAR l:IDENT                                     { $$ = newDeclar(l) }
+            |   l:IDENT                         EQUAL p:exp { $$ = newAssign(l, p) }
+            |   l:postfix DOT   i:IDENT         EQUAL p:exp { $$ = map_set(l, i, p) }
+            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = map_set(l, i, p) }
             |   s:sum                                       { $$ = s }
 
 sum     =   l:prod
@@ -174,12 +183,12 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |         n:postfix             { $$ = n }
 
 postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
-                    | DOT    s:IDENT        !EQUAL              { i = newRead(i, s) }
+                    | DOT    s:IDENT        !EQUAL              { i = map_get(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
                     | p:parameterList                           { i = apply(i, p) }
                     ) *                                         { $$ = i }
 
-parameterList = LPAREN  m:makeMap
+parameterList = LPAREN  m:newMap
                 ( e:exp             { map_append(m, e) }
                 ( COMMA e:exp       { map_append(m, e) }
                 ) *
@@ -191,7 +200,7 @@ value   =   n:NUMBER                { $$ = n }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = m }
         |   NULL                    { $$ = null }
-        |   i:IDENT                 { $$ = newRead(globals, i) }
+        |   i:IDENT                 { $$ = i }
         |   LPAREN i:exp RPAREN     { $$ = i }
 
 string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = newString(yytext) }
@@ -201,20 +210,21 @@ symbol  =   HASH    ( i:IDENT                   { $$ = newSymbol(i) }
                     | i:string                  { $$ = newSymbol(intern(get(i, String, value))) }
                     )
 
-map     =   LCB   m:makeMap
+map     =   LCB   m:newMap
             (           k:IDENT COLON v:exp     { map_set(m, k, v) }
             (     COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
             ) *
             ) ?
             RCB                                 { $$ = m }
 
-makeMap =   { $$ = makeMap() }
+newMap =   { $$ = newMap() }
 
 -       =   [ \t\n\r]*
         | "//"  ( ![\n\r] . )*
 
 IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 NUMBER	=	< [0-9]+ >	-                   { $$ = newInteger(atoi(yytext)) }
+VAR     =   'var'       -
 HASH	=	'#'			-
 PLUS	=	'+'			-
 MINUS	=	'-'			-
@@ -243,63 +253,63 @@ int getInteger(oop obj)
     return get(obj, Integer, value);
 }
 
-oop eval(oop ast)
+oop eval(oop scope, oop ast)
 {
+    switch(ast->type) {
+    case Undefined:
+    case Integer:
+    case String:
+    case Function:
+        return ast;
+    case Symbol:
+        return map_get(scope, ast);
+    }
+
     oop proto = map_get(ast, __proto___symbol);
     // proto_number is the enum version of the proto symbol
     proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
     switch (proto_number) {
+    case t_map: {
+        return ast;
+    }
+    case t_declar: {
+        oop var = map_get(ast, value_symbol);
+        return newVariable(scope, var, null);
+    }
     case t_assign: {
-        oop lhs = eval(map_get(ast, lhs_symbol));
-        oop rhs = map_get(ast, rhs_symbol);
-        oop scope = map_get(ast, scope_symbol);
-        // mmmmmmh
-        return eval(map_set(scope, lhs, rhs));
+        oop lhs = map_get(ast, lhs_symbol);
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return setVariable(scope, lhs, rhs);
     }
-    case t_read: {
-        oop scope = map_get(ast, scope_symbol);
-        // mmmmmmh
-        return eval(map_get(scope, map_get(ast, value_symbol)));
-    }
-    case t_symbol: {
+    case t_symbol: 
+    case t_integer: 
+    case t_string: { 
         return map_get(ast, value_symbol);
     }
-    case t_integer: {
-        return map_get(ast, value_symbol);
+    case t_add: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
+        return makeInteger(getInteger(lhs) + getInteger(rhs));
     }
-    case t_string: {
-        return map_get(ast, value_symbol);
+    case t_sub: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
+        return makeInteger(getInteger(lhs) - getInteger(rhs));
     }
-    case t_binary: {
-        oop lhs = eval(map_get(ast, lhs_symbol));
-        oop rhs = eval(map_get(ast, rhs_symbol));
-        proto_number = get(map_get(map_get(proto, __proto___symbol), __name___symbol), Symbol, prototype);
-        switch (proto_number) {
-        case t_add: {
-            return makeInteger(getInteger(lhs) + getInteger(rhs));
-            break;
-        }
-        case t_sub: {
-            return makeInteger(getInteger(lhs) - getInteger(rhs));
-            break;
-        }
-        case t_mul: {
-            return makeInteger(getInteger(lhs) * getInteger(rhs));
-            break;
-        }
-        case t_div: {
-            return makeInteger(getInteger(lhs) / getInteger(rhs));
-            break;
-        }
-        case t_mod: {
-            return makeInteger(getInteger(lhs) % getInteger(rhs));
-            break;
-        }
-        default: {
-            assert(0);
-            break;
-        }
-        }
+    case t_mul: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
+        return makeInteger(getInteger(lhs) * getInteger(rhs));
+    }
+    case t_div: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
+        return makeInteger(getInteger(lhs) / getInteger(rhs));
+    }
+    case t_mod: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
+        return makeInteger(getInteger(lhs) % getInteger(rhs));
     }
     default: {
         assert(0);
@@ -338,6 +348,7 @@ int main(int argc, char **argv)
     printObjectName(myInteger);
     */
 
+    /*
     oop myFirst = newObject(null);
     oop myPizzaSymbol = makeSymbol("pizza");
     map_set(myFirst, myPizzaSymbol, makeInteger(3));
@@ -345,12 +356,13 @@ int main(int argc, char **argv)
     oop myThird = newObject(mySecond);
     map_set(mySecond, myPizzaSymbol, makeInteger(4));
     println(myThird);
-    println(getMember(mySecond, myPizzaSymbol));
+    println(getVariable(mySecond, myPizzaSymbol));
+    */
     
 
     while (yyparse()) {
         println(yylval);
-        println(eval(yylval));
+        println(eval(globals, yylval));
     }
 
     return 0;
