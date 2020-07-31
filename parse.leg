@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(map) _DO(declar) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember)
+#define DO_PROTOS() _DO(map) _DO(declar) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -114,6 +114,7 @@ oop newBinary(oop proto, oop lhs, oop rhs)
     return obj;
 }
 
+// factorize a bit or not?
 oop newSetMember(oop map, oop key, oop value)
 {
     oop obj = newObject(setMember_proto);
@@ -126,6 +127,23 @@ oop newSetMember(oop map, oop key, oop value)
 oop newGetMember(oop map, oop key)
 {
     oop obj = newObject(getMember_proto);
+    map_set(obj, map_symbol, map);
+    map_set(obj, key_symbol, key);
+    return obj;
+}
+
+oop newSetIndex(oop map, oop key, oop value)
+{
+    oop obj = newObject(setIndex_proto);
+    map_set(obj, map_symbol, map);
+    map_set(obj, key_symbol, key);
+    map_set(obj, value_symbol, value);
+    return obj;
+}
+
+oop newGetIndex(oop map, oop key)
+{
+    oop obj = newObject(getIndex_proto);
     map_set(obj, map_symbol, map);
     map_set(obj, key_symbol, key);
     return obj;
@@ -175,7 +193,7 @@ start   = - e:exp               { yylval = e }
 exp     =   VAR l:IDENT                                     { $$ = newDeclar(l) }
             |   l:IDENT                         EQUAL p:exp { $$ = newAssign(l, p) }
             |   l:postfix DOT   i:IDENT         EQUAL p:exp { $$ = newSetMember(l, i, p) }
-            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = map_set(l, i, p) }
+            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = newSetIndex(l, i, p) }
             |   s:sum                                       { $$ = s }
 
 sum     =   l:prod
@@ -195,7 +213,7 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
 
 postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
                     | DOT    s:IDENT        !EQUAL              { i = newGetMember(i, s) }
-                    | LBRAC  p:exp   RBRAC  !EQUAL              { i = map_get(i, p) }
+                    | LBRAC  p:exp   RBRAC  !EQUAL              { i = newGetIndex(i, p) }
                     | p:parameterList                           { i = apply(i, p) }
                     ) *                                         { $$ = i }
 
@@ -300,6 +318,17 @@ oop eval(oop scope, oop ast)
     case t_setMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
+        oop value = eval(scope, map_get(ast, value_symbol));
+        return map_set(map, key, value);
+    }
+    case t_getIndex: {
+        oop map = eval(scope, map_get(ast, map_symbol));
+        oop key = eval(scope, map_get(ast, key_symbol));
+        return map_get(map, key);
+    }
+    case t_setIndex: {
+        oop map = eval(scope, map_get(ast, map_symbol));
+        oop key = eval(scope, map_get(ast, key_symbol));
         oop value = eval(scope, map_get(ast, value_symbol));
         return map_set(map, key, value);
     }
