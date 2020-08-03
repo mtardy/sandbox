@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(map) _DO(call) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
+#define DO_PROTOS() _DO(map) _DO(call) _DO(func) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -22,7 +22,7 @@ DO_PROTOS()
 // this is the global scope
 oop globals;
 
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(key) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(func) _DO(args)
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(name) _DO(body) _DO(key) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(args)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -145,6 +145,14 @@ oop newGetIndex(oop map, oop key)
     return obj;
 }
 
+oop newFunc(oop name, oop body)
+{
+    oop func = newObject(func_proto);
+    map_set(func, name_symbol, name);
+    map_set(func, body_symbol, body);
+    return func;
+}
+
 oop newCall(oop func, oop args)
 {
     oop call = newObject(call_proto);
@@ -175,7 +183,6 @@ oop getVariable(oop object, oop key)
 // this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
 oop setVariable(oop object, oop key, oop value)
 {
-    oop firstObject = object;
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
         if (object == null) {
@@ -196,6 +203,7 @@ start   = - e:exp               { yylval = e }
 
 exp     =   VAR l:IDENT                         EQUAL p:exp { $$ = newDeclaration(l, p) }
         |   VAR l:IDENT                                     { $$ = newDeclaration(l, null) }
+        |   FUN l:IDENT                 LPAREN RPAREN p:exp { $$ = newFunc(l, p) }
         |       l:IDENT                         EQUAL p:exp { $$ = newAssign(l, p) }
         |       l:postfix DOT   i:IDENT         EQUAL p:exp { $$ = newSetMember(l, i, p) }
         |       l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = newSetIndex(l, i, p) }
@@ -216,13 +224,13 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |   PLUS  n:prefix              { $$ = n }
         |         n:postfix             { $$ = n }
 
-postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(p, intern("this"), i); i = newCall(i, a) }
+postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, intern("this"), i); i = newCall(i, a) }
                     | DOT    s:IDENT        !EQUAL              { i = newGetMember(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = newGetIndex(i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
-argumentList = LPAREN  m:newMap
+argumentList = LPAREN  m:makeMap
                 ( e:exp             { map_append(m, e) }
                 ( COMMA e:exp       { map_append(m, e) }
                 ) *
@@ -251,6 +259,7 @@ map     =   LCB   m:newMap
             ) ?
             RCB                                 { $$ = m }
 
+makeMap=   { $$ = makeMap() }
 newMap =   { $$ = newMap() }
 
 -       =   [ \t\n\r]*
@@ -258,6 +267,7 @@ newMap =   { $$ = newMap() }
 
 IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 NUMBER	=	< [0-9]+ >	-                   { $$ = newInteger(atoi(yytext)) }
+FUN     =   'fun'  ![a-zA-Z0-9_]        -
 VAR     =   'var'  ![a-zA-Z0-9_]        -
 NULL	=	'null' ![a-zA-Z0-9_]	    -
 HASH	=	'#'			-
@@ -286,6 +296,8 @@ int getInteger(oop obj)
 {
     return get(obj, Integer, value);
 }
+
+oop evalArgs(oop scope, oop args);
 
 oop eval(oop scope, oop ast)
 {
@@ -319,9 +331,18 @@ oop eval(oop scope, oop ast)
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return setVariable(scope, lhs, rhs);
     }
+    case t_func: {
+        oop name = map_get(ast, name_symbol);
+        oop body = map_get(ast, body_symbol);
+        return newVariable(scope, name, makeFunction(NULL, body));
+    }
     case t_call: {
         oop func = eval(scope, map_get(ast, func_symbol));
-        oop args = map_get(ast, args_symbol);
+        // args should be evaluated
+        oop args = evalArgs(scope, map_get(ast, args_symbol));
+        if (get(func, Function, primitive) == NULL) {
+            return eval(scope, get(func, Function, body));
+        }
         return get(func, Function, primitive)(args);
     }
     case t_getMember: {
@@ -391,13 +412,24 @@ oop prim_exit(oop params)
     exit(0);
 }
 
+oop evalArgs(oop scope, oop args)
+{
+   int i = 0;
+   oop params = makeMap();
+   oop index;
+   while ((index = makeInteger(i)), map_hasKey(args, index)) {
+       map_set(params, index, eval(scope, map_get(args, index)));
+       i++;
+   }
+   return params;
+}
 
 int main(int argc, char **argv)
 {
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit"), makeFunction(prim_exit));
+    map_set(globals, intern("exit"), makeFunction(prim_exit, null));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()

@@ -48,6 +48,7 @@ typedef oop (*primitive_t)(oop params);
 struct Function {
     type_t type;
     primitive_t primitive;
+    oop body;
 };
 
 // usefull for map's elements
@@ -136,11 +137,12 @@ oop makeSymbol(char *name)
     return newSymb;
 }
 
-oop makeFunction(primitive_t primitive)
+oop makeFunction(primitive_t primitive, oop body)
 {
     oop newFunc = memcheck(malloc(sizeof(union object)));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
+    newFunc->Function.body = body;
     return newFunc;
 }
 
@@ -271,7 +273,7 @@ void map_print(oop map, int ident)
     assert(is(Map, map));
     if (ident > 1) {
         printf("\n");
-    } 
+    }
     for (size_t i = 0; i < get(map, Map, size); i++) {
         for (size_t i = 0; i < ident; i++) {
             printf("|");
@@ -366,4 +368,3 @@ oop intern(char *ident)
     map_insert(symbol_table, symbol, null, pos);
     return symbol;
 }
- 
