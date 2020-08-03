@@ -5,7 +5,7 @@ LDLIBS	= -L/usr/local/lib -lgc
 
 # moved LDLIBS to end because ld scans files from left to right and collects only required symbols
 
-calc: parse.c object.c
+parse: parse.c object.c
 	$(CC) $(CFLAGS) -o parse parse.c $(LDLIBS)
 
 parse.c: parse.leg
