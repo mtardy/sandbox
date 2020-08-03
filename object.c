@@ -49,6 +49,7 @@ struct Function {
     type_t type;
     primitive_t primitive;
     oop body;
+    oop param;
 };
 
 // usefull for map's elements
@@ -137,11 +138,12 @@ oop makeSymbol(char *name)
     return newSymb;
 }
 
-oop makeFunction(primitive_t primitive, oop body)
+oop makeFunction(primitive_t primitive, oop param, oop body)
 {
     oop newFunc = memcheck(malloc(sizeof(union object)));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
+    newFunc->Function.param = param;
     newFunc->Function.body = body;
     return newFunc;
 }
@@ -368,3 +370,4 @@ oop intern(char *ident)
     map_insert(symbol_table, symbol, null, pos);
     return symbol;
 }
+ 
