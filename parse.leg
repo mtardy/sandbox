@@ -6,7 +6,7 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(map) _DO(declar) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
+#define DO_PROTOS() _DO(map) _DO(call) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -22,12 +22,7 @@ DO_PROTOS()
 // this is the global scope
 oop globals;
 
-oop apply(oop function, oop parameters)
-{
-    return get(function, Function, primitive)(parameters);
-}
-
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(key) _DO(value) _DO(lhs) _DO(rhs) _DO(scope)
+#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(key) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(func) _DO(args)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -67,11 +62,12 @@ oop newMap()
     return map;
 }
 
-oop newDeclar(oop value)
+oop newDeclaration(oop name, oop exp)
 {
-    oop declar = newObject(declar_proto);
-    map_set(declar, value_symbol, value);
-    return declar;
+    oop declaration = newObject(declaration_proto);
+    map_set(declaration, lhs_symbol, name);
+    map_set(declaration, rhs_symbol, exp);
+    return declaration;
 }
 
 oop newAssign(oop lhs, oop rhs)
@@ -149,6 +145,14 @@ oop newGetIndex(oop map, oop key)
     return obj;
 }
 
+oop newCall(oop func, oop args)
+{
+    oop call = newObject(call_proto);
+    map_set(call, func_symbol, func);
+    map_set(call, args_symbol, args);
+    return call;
+}
+
 // this always creates the key in "object"
 oop newVariable(oop object, oop key, oop value)
 {
@@ -190,11 +194,12 @@ YYSTYPE yylval;
 
 start   = - e:exp               { yylval = e }
 
-exp     =   VAR l:IDENT                                     { $$ = newDeclar(l) }
-            |   l:IDENT                         EQUAL p:exp { $$ = newAssign(l, p) }
-            |   l:postfix DOT   i:IDENT         EQUAL p:exp { $$ = newSetMember(l, i, p) }
-            |   l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = newSetIndex(l, i, p) }
-            |   s:sum                                       { $$ = s }
+exp     =   VAR l:IDENT                         EQUAL p:exp { $$ = newDeclaration(l, p) }
+        |   VAR l:IDENT                                     { $$ = newDeclaration(l, null) }
+        |       l:IDENT                         EQUAL p:exp { $$ = newAssign(l, p) }
+        |       l:postfix DOT   i:IDENT         EQUAL p:exp { $$ = newSetMember(l, i, p) }
+        |       l:postfix LBRAC i:exp   RBRAC   EQUAL p:exp { $$ = newSetIndex(l, i, p) }
+        |       s:sum                                       { $$ = s }
 
 sum     =   l:prod
             ( PLUS+ r:prod          { l = newBinary(add_proto, l, r) }
@@ -211,13 +216,13 @@ prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer
         |   PLUS  n:prefix              { $$ = n }
         |         n:postfix             { $$ = n }
 
-postfix =   i:value ( DOT    s:IDENT        p:parameterList     { map_set(p, intern("this"), i);  i = apply(map_get(i, s), p) }
+postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(p, intern("this"), i); i = newCall(i, a) }
                     | DOT    s:IDENT        !EQUAL              { i = newGetMember(i, s) }
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = newGetIndex(i, p) }
-                    | p:parameterList                           { i = apply(i, p) }
+                    | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
-parameterList = LPAREN  m:newMap
+argumentList = LPAREN  m:newMap
                 ( e:exp             { map_append(m, e) }
                 ( COMMA e:exp       { map_append(m, e) }
                 ) *
@@ -253,7 +258,8 @@ newMap =   { $$ = newMap() }
 
 IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 NUMBER	=	< [0-9]+ >	-                   { $$ = newInteger(atoi(yytext)) }
-VAR     =   'var'       -
+VAR     =   'var'  ![a-zA-Z0-9_]        -
+NULL	=	'null' ![a-zA-Z0-9_]	    -
 HASH	=	'#'			-
 PLUS	=	'+'			-
 MINUS	=	'-'			-
@@ -261,7 +267,6 @@ MULTI	=	'*'			-
 DIVIDE	=	'/'			-
 MODULO	=	'%'			-
 EQUAL	=	'='			-
-NULL	=	'null'		-
 COLON	=	':'			-
 COMMA	=	','			-
 DOT		=	'.'			-
@@ -295,20 +300,29 @@ oop eval(oop scope, oop ast)
     }
 
     oop proto = map_get(ast, __proto___symbol);
+    if (proto == null) {
+        return ast;
+    }
     // proto_number is the enum version of the proto symbol
     proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
     switch (proto_number) {
     case t_map: {
         return ast;
     }
-    case t_declar: {
-        oop var = map_get(ast, value_symbol);
-        return newVariable(scope, var, null);
+    case t_declaration: {
+        oop lhs = map_get(ast, lhs_symbol);
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return newVariable(scope, lhs, rhs);
     }
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return setVariable(scope, lhs, rhs);
+    }
+    case t_call: {
+        oop func = eval(scope, map_get(ast, func_symbol));
+        oop args = map_get(ast, args_symbol);
+        return get(func, Function, primitive)(args);
     }
     case t_getMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
@@ -370,10 +384,20 @@ oop eval(oop scope, oop ast)
     return null;
 }
 
+oop prim_exit(oop params)
+{
+    printf("bye bye with params ");
+    println(params);
+    exit(0);
+}
+
+
 int main(int argc, char **argv)
 {
     symbol_table = makeMap();
     globals = makeMap();
+
+    map_set(globals, intern("exit"), makeFunction(prim_exit));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
