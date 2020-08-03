@@ -177,7 +177,19 @@ ssize_t map_search(oop map, oop key)
 {
     assert(is(Map, map));
     assert(key);
+
     ssize_t l = 0, r = get(map, Map, size) - 1;
+    /* this optimization can only work if the array is consistent
+       ie. doesn't start at 3 because of existing member, see map_append
+    if (is(Integer, key)) {
+        size_t index = get(key, Integer, value);
+        if (index > r) {
+            return -1 - (r + 1);
+        }
+        return
+    }
+    */
+
     while (l <= r) {
         ssize_t mid = (l + r) / 2;
         int cmpres = oopcmp(get(map, Map, elements)[mid].key, key);
@@ -370,4 +382,3 @@ oop intern(char *ident)
     map_insert(symbol_table, symbol, null, pos);
     return symbol;
 }
- 

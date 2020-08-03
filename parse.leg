@@ -230,7 +230,7 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, int
                     | LBRAC  p:exp   RBRAC  !EQUAL              { i = newGetIndex(i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
-                    
+
 paramList    = LPAREN  m:makeMap
                 ( i:IDENT           { map_append(m, i) }
                 ( COMMA i:IDENT     { map_append(m, i) }
