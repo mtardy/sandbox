@@ -50,6 +50,7 @@ struct Function {
     primitive_t primitive;
     oop body;
     oop param;
+    oop parentScope;
 };
 
 // usefull for map's elements
@@ -138,13 +139,14 @@ oop makeSymbol(char *name)
     return newSymb;
 }
 
-oop makeFunction(primitive_t primitive, oop param, oop body)
+oop makeFunction(primitive_t primitive, oop param, oop body, oop parentScope)
 {
     oop newFunc = memcheck(malloc(sizeof(union object)));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
     newFunc->Function.param = param;
     newFunc->Function.body = body;
+    newFunc->Function.parentScope = parentScope;
     return newFunc;
 }
 
@@ -178,18 +180,18 @@ ssize_t map_search(oop map, oop key)
     assert(is(Map, map));
     assert(key);
 
-    ssize_t l = 0, r = get(map, Map, size) - 1;
-    /* this optimization can only work if the array is consistent
-       ie. doesn't start at 3 because of existing member, see map_append
+    ssize_t r = get(map, Map, size) - 1;
+
     if (is(Integer, key)) {
-        size_t index = get(key, Integer, value);
+        ssize_t index = get(key, Integer, value);
         if (index > r) {
             return -1 - (r + 1);
         }
-        return
+        oop probe = get(map, Map, elements)[index].key;
+	if (key == probe) return index;
     }
-    */
 
+    ssize_t l = 0;
     while (l <= r) {
         ssize_t mid = (l + r) / 2;
         int cmpres = oopcmp(get(map, Map, elements)[mid].key, key);

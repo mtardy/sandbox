@@ -205,6 +205,7 @@ start   = - e:exp               { yylval = e }
 exp     =   VAR l:IDENT                         EQUAL e:exp { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                     { $$ = newDeclaration(l, null) }
         |   FUN l:IDENT                   p:paramList e:exp { $$ = newFunc(l, p, e) }
+        |   FUN                           p:paramList e:exp { $$ = newFunc(null, p, e) }
         |       l:IDENT                         EQUAL e:exp { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT         EQUAL e:exp { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC   EQUAL e:exp { $$ = newSetIndex(l, i, e) }
@@ -333,7 +334,7 @@ oop eval(oop scope, oop ast)
     case Function:
         return ast;
     case Symbol:
-        return map_get(scope, ast);
+        return getVariable(scope, ast);
     }
 
     oop proto = map_get(ast, __proto___symbol);
@@ -360,7 +361,11 @@ oop eval(oop scope, oop ast)
         oop name = map_get(ast, name_symbol);
         oop param = map_get(ast, param_symbol);
         oop body = map_get(ast, body_symbol);
-        return newVariable(scope, name, makeFunction(NULL, param, body));
+        oop func = makeFunction(NULL, param, body, scope);
+        printf("funcscope\n");
+        println(scope);
+        if (name == null) return func;
+        return newVariable(scope, name, func);
     }
     case t_call: {
         oop func = eval(scope, map_get(ast, func_symbol));
@@ -368,6 +373,10 @@ oop eval(oop scope, oop ast)
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
             oop localScope = map_fromArrays(param, args);
+            map_set(localScope, __proto___symbol, get(func, Function, parentScope));
+            printf("localscope\n");
+            println(get(func, Function, parentScope));
+            println(localScope);
             return eval(localScope, get(func, Function, body));
         }
         return get(func, Function, primitive)(args);
@@ -456,7 +465,7 @@ int main(int argc, char **argv)
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit"), makeFunction(prim_exit, null, null));
+    map_set(globals, intern("exit"), makeFunction(prim_exit, null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
