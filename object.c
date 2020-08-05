@@ -2,10 +2,51 @@
 #include <stdint.h>
 #include <sysexits.h>
 #include <assert.h>
-#include <gc.h> // NEVER, EVER HAVE TO CALL FREE (EVER) AGAIN (YES, REALLY)
 
-#define malloc(n)       GC_MALLOC(n)
-#define realloc(o, n)   GC_REALLOC(o, n)
+#define USE_GC   1
+
+#if (USE_GC)
+# include <gc.h>
+#endif
+
+void *xmalloc(size_t n)
+{
+#if (USE_GC)
+    void *mem= GC_malloc(n);
+#else
+    void *mem= calloc(1, n);
+#endif
+    assert(mem);
+    return mem;
+}
+
+void *xrealloc(void *p, size_t n)
+{
+#if (USE_GC)
+    void *mem= GC_realloc(p, n);
+#else
+    void *mem= realloc(p, n);
+#endif
+    assert(mem);
+    return mem;
+}
+
+char *xstrdup(char *s)
+{
+#if (USE_GC)
+    size_t len= strlen(s);
+    char  *mem= GC_malloc_atomic(len + 1);
+    memcpy(mem, s, len + 1);
+#else
+    char *mem= strdup(s);
+#endif
+    assert(mem);
+    return mem;
+}
+
+#define malloc(n)       xmalloc(n)
+#define realloc(o, n)   xrealloc(o, n)
+#define strdup(s)       xstrdup(s)
 
 typedef enum {
     Undefined,
@@ -113,6 +154,9 @@ void *memcheck(void *ptr)
     return ptr;
 }
 
+void print(oop ast);
+void println(oop ast);
+
 oop makeInteger(int value)
 {
     oop newInt = memcheck(malloc(sizeof(union object)));
@@ -134,7 +178,7 @@ oop makeSymbol(char *name)
 {
     oop newSymb = memcheck(malloc(sizeof(union object)));
     newSymb->type = Symbol;
-    newSymb->Symbol.name = name;
+    newSymb->Symbol.name = memcheck(strdup(name));
     newSymb->Symbol.prototype = 0;
     return newSymb;
 }
@@ -157,6 +201,14 @@ oop makeMap()
     return newMap;
 }
 
+bool map_hasIntegerKey(oop map, size_t index)
+{
+    if (index >= get(map, Map, size)) return 0;
+    oop key= get(map, Map, elements)[index].key;
+    if (!is(Integer, key)) return 0;
+    return index == get(key, Integer, value);
+}
+
 int oopcmp(oop a, oop b)
 {
     type_t ta = getType(a), tb = getType(b);
@@ -166,10 +218,10 @@ int oopcmp(oop a, oop b)
             return get(a, Integer, value) - get(b, Integer, value);
         case String:
             return strcmp(get(a, String, value), get(b, String, value));
-        case Symbol:
-            return a - b;
         default:
-            return (intptr_t)a - (intptr_t)b;
+	    if (a < b) return -1;
+	    if (a > b) return  1;
+	    return 0;
         }
     }
     return ta - tb;
@@ -195,7 +247,7 @@ ssize_t map_search(oop map, oop key)
     while (l <= r) {
         ssize_t mid = (l + r) / 2;
         int cmpres = oopcmp(get(map, Map, elements)[mid].key, key);
-        if (cmpres > 0)         r = mid - 1;
+        if      (cmpres > 0)    r = mid - 1;
         else if (cmpres < 0)    l = mid + 1;
         else                    return mid; // non-negative result => element found at this index
     }
@@ -244,7 +296,7 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
     // I mean modifying something on a line that begin with "get"... :/
     get(map, Map, elements)[pos].value = value;
     get(map, Map, elements)[pos].key = key;
-    set(map, Map, size, ++get(map, Map, size));
+    set(map, Map, size, get(map, Map, size) + 1);
 
     return value;
 }
@@ -269,11 +321,11 @@ oop map_del(oop map, oop key)
     assert(is(Map, map));
     assert(is(String, key));
     ssize_t pos = map_search(map, key);
-    if (pos < 0)    return map;
+    if (pos < 0) return map;
     if (pos < get(map, Map, size) - 1) {
         memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * (get(map, Map, size) - pos));
     }
-    set(map, Map, size, --get(map, Map, size));
+    set(map, Map, size, get(map, Map, size) - 1);
     return map;
 }
 
@@ -281,8 +333,6 @@ oop map_append(oop map, oop value)
 {
     return map_set(map, makeInteger(get(map, Map, size)), value);
 }
-
-void print(oop ast);
 
 void map_print(oop map, int ident)
 {
@@ -380,7 +430,7 @@ oop intern(char *ident)
     ssize_t pos = map_intern_search(symbol_table, ident);
     if (pos >= 0) return get(symbol_table, Map, elements)[pos].key;
     pos = -1 - pos; // 'un-negate' the result by reflecting it around X=-1
-    oop symbol = makeSymbol(memcheck(strdup(ident)));
+    oop symbol = makeSymbol(ident);
     map_insert(symbol_table, symbol, null, pos);
     return symbol;
 }

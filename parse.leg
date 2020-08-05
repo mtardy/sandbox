@@ -6,7 +6,12 @@
  * run:		echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS() _DO(map) _DO(call) _DO(func) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string) _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
+#define DO_PROTOS()													\
+    _DO(map) _DO(if) _DO(while) _DO(call) _DO(func) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string)	\
+    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)								\
+    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)			\
+    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)						\
+    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -20,9 +25,12 @@ DO_PROTOS()
 #include "object.c"
 
 // this is the global scope
-oop globals;
+oop globals= 0;
 
-#define DO_SYMBOLS() DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(lhs) _DO(rhs) _DO(scope) _DO(args)
+#define DO_SYMBOLS()											\
+     DO_PROTOS() _DO(__proto__) _DO(__name__)								\
+    _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)	\
+    _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(statements)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -31,6 +39,8 @@ DO_SYMBOLS()
 #define _DO(NAME) oop NAME##_proto;
 DO_PROTOS()
 #undef _DO
+
+int opt_v = 0;
 
 oop newObject(oop proto)
 {
@@ -70,6 +80,23 @@ oop newDeclaration(oop name, oop exp)
     return declaration;
 }
 
+oop newIf(oop cond, oop cons, oop alt)
+{
+    oop obj = newObject(if_proto);
+    map_set(obj, condition_symbol,  cond);
+    map_set(obj, consequent_symbol, cons);
+    map_set(obj, alternate_symbol,  alt);
+    return obj;
+}
+
+oop newWhile(oop cond, oop body)
+{
+    oop obj = newObject(while_proto);
+    map_set(obj, condition_symbol, cond);
+    map_set(obj, body_symbol,      body);
+    return obj;
+}
+
 oop newAssign(oop lhs, oop rhs)
 {
     oop assign = newObject(assign_proto);
@@ -94,12 +121,74 @@ oop newInteger(int value)
     return integer;
 }
 
+int isradix(int r, int c)
+{
+    if (c <  '0') return 0;
+    if (c >= 'a') c -= 'a' - 'A';	// tolower(c)
+    if ('9' < c && c < 'A') return 0;
+    if (c >= 'A') c -= 'A' - 10;
+    return c < r;
+}
+
+char *unescape(char *s)
+{
+    char *t= strdup(s);		// this is garbage collected
+    int in= 0, out= 0, c= 0;
+    while (0 != (c= t[in++])) {
+	if ('\\' == c && 0 != (c= t[in++])) {
+	    switch (c) {
+		case 'a': c= '\a'; break;
+		case 'b': c= '\b'; break;
+		case 'e': c= '\e'; break;
+		case 'f': c= '\f'; break;
+		case 'n': c= '\n'; break;
+		case 'r': c= '\r'; break;
+		case 't': c= '\t'; break;
+		case 'v': c= '\v'; break;
+		case '0'...'7': {
+		    c= c - '0';
+		    ++in;
+		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+		    break;
+		}
+		case 'x': {
+		    c= 0;
+		    ++in;
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    break;
+		}
+		case 'u': {
+		    c= 0;
+		    ++in;
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
+		    break;
+		}
+	    }
+	}
+	t[out++]= c;
+    }
+    t[out]= 0;
+    return t;
+}
+
 oop newString(char *value)
 {
     oop string = newObject(string_proto);
     oop primitive_string = makeString(value);
     map_set(string, value_symbol, primitive_string);
     return string;
+}
+
+oop newUnary(oop proto, oop rhs)
+{
+    oop obj = newObject(proto);
+    map_set(obj, rhs_symbol, rhs);
+    return obj;
 }
 
 oop newBinary(oop proto, oop lhs, oop rhs)
@@ -148,9 +237,9 @@ oop newGetIndex(oop map, oop key)
 oop newFunc(oop name, oop param, oop body)
 {
     oop func = newObject(func_proto);
-    map_set(func, name_symbol, name);
+    map_set(func, name_symbol,  name);
     map_set(func, param_symbol, param);
-    map_set(func, body_symbol, body);
+    map_set(func, body_symbol,  body);
     return func;
 }
 
@@ -200,19 +289,64 @@ YYSTYPE yylval;
 
 %}
 
-start   = - e:exp               { yylval = e }
+start   = - e:stmt	                                     { yylval = e }
 
-exp     =   VAR l:IDENT                         EQUAL e:exp { $$ = newDeclaration(l, e) }
-        |   VAR l:IDENT                                     { $$ = newDeclaration(l, null) }
-        |   FUN l:IDENT                   p:paramList e:exp { $$ = newFunc(l, p, e) }
-        |   FUN                           p:paramList e:exp { $$ = newFunc(null, p, e) }
-        |       l:IDENT                         EQUAL e:exp { $$ = newAssign(l, e) }
-        |       l:postfix DOT   i:IDENT         EQUAL e:exp { $$ = newSetMember(l, i, e) }
-        |       l:postfix LBRAC i:exp   RBRAC   EQUAL e:exp { $$ = newSetIndex(l, i, e) }
-        |       s:sum                                       { $$ = s }
+stmt	=   e:exp SEMICOLON*				     { $$= e }
+
+exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
+        |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
+        |   FUN l:IDENT                   p:paramList e:stmt { $$ = newFunc(l, p, e) }
+        |   FUN                           p:paramList e:stmt { $$ = newFunc(null, p, e) }
+	|   IF 	  LPAREN c:exp RPAREN t:stmt ELSE f:stmt     { $$ = newIf(c, t, f   ) }
+	|   IF 	  LPAREN c:exp RPAREN t:stmt		     { $$ = newIf(c, t, null) }
+	|   WHILE LPAREN c:exp RPAREN e:stmt		     { $$ = newWhile(c, e) }
+        |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
+        |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
+        |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
+        |       c:cond                                       { $$ = c }
+
+cond    =   c:logor QUERY t:exp COLON f:cond		     { $$ = newIf(c, t, f) }
+	|   logor
+
+logor   =   l:logand
+	    ( LOGOR r:logand            { l = newBinary(logor_proto,   	 l, r) }
+	    )*				{ $$ = l }
+
+logand  =   l:bitor
+	    ( LOGAND r:bitor            { l = newBinary(logand_proto,  	 l, r) }
+	    )*				{ $$ = l }
+
+bitor   =   l:bitxor
+	    ( BITOR r:bitxor            { l = newBinary(bitor_proto,  	 l, r) }
+	    )*				{ $$ = l }
+
+bitxor  =   l:bitand
+	    ( BITXOR r:bitand           { l = newBinary(bitxor_proto,  	 l, r) }
+	    )*				{ $$ = l }
+
+bitand  =   l:eq
+	    ( BITAND r:eq               { l = newBinary(bitand_proto,  	 l, r) }
+	    )*				{ $$ = l }
+
+eq      =   l:ineq
+            ( EQUAL r:ineq              { l = newBinary(equal_proto,   	 l, r) }
+            | NOTEQ r:ineq              { l = newBinary(noteq_proto, 	 l, r) }
+            )*                          { $$ = l }
+
+ineq    =   l:shift
+            ( LESS      r:shift         { l = newBinary(less_proto,   	 l, r) }
+            | LESSEQ    r:shift         { l = newBinary(lesseq_proto, 	 l, r) }
+            | GREATEREQ r:shift         { l = newBinary(greatereq_proto, l, r) }
+            | GREATER   r:shift         { l = newBinary(greater_proto,   l, r) }
+            )*                          { $$ = l }
+
+shift   =   l:sum
+            ( SHLEFT  r:sum             { l = newBinary(shleft_proto,  l, r) }
+            | SHRIGHT r:sum             { l = newBinary(shright_proto, l, r) }
+            )*                          { $$ = l }
 
 sum     =   l:prod
-            ( PLUS+ r:prod          { l = newBinary(add_proto, l, r) }
+            ( PLUS  r:prod          { l = newBinary(add_proto, l, r) }
             | MINUS r:prod          { l = newBinary(sub_proto, l, r) }
             )*                      { $$ = l }
 
@@ -222,13 +356,15 @@ prod    =   l:prefix
             | MODULO    r:prefix        { l = newBinary(mod_proto, l, r) }
             )*                          { $$ = l }
 
-prefix  =   MINUS n:prefix              { set(n, Integer, value, -get(n, Integer, value));  $$ = n }
-        |   PLUS  n:prefix              { $$ = n }
-        |         n:postfix             { $$ = n }
+prefix  =   PLUS   n:prefix             { $$= n }
+        |   MINUS  n:prefix             { $$= newUnary(neg_proto, n) }
+        |   TILDE  n:prefix             { $$= newUnary(com_proto, n) }
+        |   PLING  n:prefix             { $$= newUnary(not_proto, n) }
+        |          n:postfix            { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, intern("this"), i); i = newCall(i, a) }
-                    | DOT    s:IDENT        !EQUAL              { i = newGetMember(i, s) }
-                    | LBRAC  p:exp   RBRAC  !EQUAL              { i = newGetIndex(i, p) }
+                    | DOT    s:IDENT        !ASSIGN             { i = newGetMember(i, s) }
+                    | LBRAC  p:exp   RBRAC  !ASSIGN             { i = newGetIndex(i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
@@ -252,10 +388,12 @@ value   =   n:NUMBER                { $$ = n }
         |   m:map                   { $$ = m }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = i }
-        |   LPAREN i:exp RPAREN     { $$ = i }
+        |   LPAREN i:exp   RPAREN   { $$ = i }
 
-string  =   SQUOTE < (!SQUOTE .)* > SQUOTE      { $$ = newString(yytext) }
-        |   DQUOTE < (!DQUOTE .)* > DQUOTE      { $$ = newString(yytext) }
+string  =   SQUOTE < (!SQUOTE char)* > SQUOTE      { $$ = newString(unescape(yytext)) }
+        |   DQUOTE < (!DQUOTE char)* > DQUOTE      { $$ = newString(unescape(yytext)) }
+
+char    =   '\\' . | .
 
 symbol  =   HASH    ( i:IDENT                   { $$ = newSymbol(i) }
                     | i:string                  { $$ = newSymbol(intern(get(i, String, value))) }
@@ -271,32 +409,59 @@ map     =   LCB   m:newMap
 makeMap=   { $$ = makeMap() }
 newMap =   { $$ = newMap() }
 
--       =   [ \t\n\r]*
-        | "//"  ( ![\n\r] . )*
+-       =  (blank | comment)*
 
-IDENT	=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
-NUMBER	=	< [0-9]+ >	-                   { $$ = newInteger(atoi(yytext)) }
-FUN     =   'fun'  ![a-zA-Z0-9_]        -
-VAR     =   'var'  ![a-zA-Z0-9_]        -
-NULL	=	'null' ![a-zA-Z0-9_]	    -
-HASH	=	'#'			-
-PLUS	=	'+'			-
-MINUS	=	'-'			-
-MULTI	=	'*'			-
-DIVIDE	=	'/'			-
-MODULO	=	'%'			-
-EQUAL	=	'='			-
-COLON	=	':'			-
-COMMA	=	','			-
-DOT		=	'.'			-
-LCB		=	'{'			-
-RCB		=	'}'			-
-LBRAC	=	'['			-
-RBRAC	=	']'			-
-LPAREN	=	'('			-
-RPAREN	=	')'			-
-DQUOTE	=	'"'			-
-SQUOTE	=	"'"			-
+blank   =  [ \t\n\r]
+
+comment =  "//"  ( ![\n\r] . )*
+        |  "/*"  ( !"*/"   . )* "*/"
+
+IDENT		=	< [a-zA-Z][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
+NUMBER		=	'0b' < [01]+        >	    -   { $$ = newInteger(strtol(yytext, 0,  2)) }
+		|       '0x' < [0-9a-fA-F]+ >	    -   { $$ = newInteger(strtol(yytext, 0, 16)) }
+		|       '0'  < [0-7]+       >	    -   { $$ = newInteger(strtol(yytext, 0,  8)) }
+		|            < [0-9]+       >	    -   { $$ = newInteger(strtol(yytext, 0, 10)) }
+FUN     	=   	'fun'  	![a-zA-Z0-9_]       -
+VAR     	=   	'var'  	![a-zA-Z0-9_]       -
+WHILE   	=   	'while' ![a-zA-Z0-9_]       -
+IF      	=   	'if'   	![a-zA-Z0-9_]       -
+ELSE    	=   	'else' 	![a-zA-Z0-9_]       -
+NULL		=	'null' 	![a-zA-Z0-9_]	    -
+HASH		=	'#'			    -
+LOGOR		=	'||'			    -
+LOGAND		=	'&&'			    -
+BITOR		=	'|'	![|=]		    -
+BITXOR		=	'^'	![=]		    -
+BITAND		=	'&'	![&=]		    -
+EQUAL		=	'=='			    -
+NOTEQ		=	'!='			    -
+LESS		=	'<'     ![<=]		    -
+LESSEQ		=	'<='     		    -
+GREATEREQ	=	'>='     		    -
+GREATER		=	'>'     ![>=]		    -
+SHLEFT		=	'<<'	![=]		    -
+SHRIGHT		=	'>>'	![=]		    -
+PLUS		=	'+'	![+=]		    -
+MINUS		=	'-'	![-=]		    -
+TILDE		=	'~'			    -
+PLING		=	'!'	![=]		    -
+MULTI		=	'*'	![=]		    -
+DIVIDE		=	'/'	![/=]		    -
+MODULO		=	'%'	![=]		    -
+ASSIGN		=	'='     ![=]		    -
+QUERY		=	'?'			    -
+COLON		=	':'			    -
+SEMICOLON	=	';'			    -
+COMMA		=	','			    -
+DOT		=	'.'			    -
+LCB		=	'{'			    -
+RCB		=	'}'			    -
+LBRAC		=	'['			    -
+RBRAC		=	']'			    -
+LPAREN		=	'('			    -
+RPAREN		=	')'			    -
+DQUOTE		=	'"'			    -
+SQUOTE		=	"'"			    -
 
 %%
 ;
@@ -304,6 +469,16 @@ SQUOTE	=	"'"			-
 int getInteger(oop obj)
 {
     return get(obj, Integer, value);
+}
+
+int isFalse(oop obj)
+{
+    return obj == null || (is(Integer, obj) && (0 == get(obj, Integer, value)));
+}
+
+int isTrue(oop obj)
+{
+    return !isFalse(obj);
 }
 
 oop map_fromArrays(oop keys, oop values)
@@ -328,14 +503,18 @@ oop evalArgs(oop scope, oop args);
 oop eval(oop scope, oop ast)
 {
     switch(ast->type) {
-    case Undefined:
-    case Integer:
-    case String:
-    case Function:
-        return ast;
-    case Symbol:
-        return getVariable(scope, ast);
+	case Undefined:
+	case Integer:
+	case String:
+	case Function:
+	    return ast;
+	case Symbol:
+	    return getVariable(scope, ast);
+	case Map:
+	    break;
     }
+
+    assert(is(Map, ast));
 
     oop proto = map_get(ast, __proto___symbol);
     if (proto == null) {
@@ -344,6 +523,10 @@ oop eval(oop scope, oop ast)
     // proto_number is the enum version of the proto symbol
     proto_t proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
     switch (proto_number) {
+	case t_UNDEFINED: {
+	    assert(0);
+	    return 0;
+	}
     case t_map: {
         return ast;
     }
@@ -352,31 +535,54 @@ oop eval(oop scope, oop ast)
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return newVariable(scope, lhs, rhs);
     }
+    case t_if: {
+        oop condition  = map_get(ast, condition_symbol );
+        oop consequent = map_get(ast, consequent_symbol);
+        oop alternate  = map_get(ast, alternate_symbol );
+	return eval(scope, isTrue(eval(scope, condition)) ? consequent : alternate);
+    }
+    case t_while: {
+        oop condition = map_get(ast, condition_symbol );
+        oop body      = map_get(ast, body_symbol);
+	oop result    = null;
+	while (isTrue(eval(scope, condition))) result= eval(scope, body);
+	return result;
+    }
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return setVariable(scope, lhs, rhs);
     }
     case t_func: {
-        oop name = map_get(ast, name_symbol);
+        oop name  = map_get(ast, name_symbol);
         oop param = map_get(ast, param_symbol);
-        oop body = map_get(ast, body_symbol);
-        oop func = makeFunction(NULL, param, body, scope);
-        printf("funcscope\n");
-        println(scope);
-        if (name == null) return func;
-        return newVariable(scope, name, func);
+        oop body  = map_get(ast, body_symbol);
+        oop func  = makeFunction(NULL, param, body, scope);
+	if (opt_v) {
+	    printf("funcscope\n");
+	    println(scope);
+	}
+        if (name != null) newVariable(scope, name, func);
+        if (opt_v) println(scope);
+	return func;
     }
     case t_call: {
         oop func = eval(scope, map_get(ast, func_symbol));
+	if (!is(Function, func)) {
+	    printf("cannot call ");
+	    println(func);
+	    exit(1);
+	}
         oop args = evalArgs(scope, map_get(ast, args_symbol));
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
             oop localScope = map_fromArrays(param, args);
             map_set(localScope, __proto___symbol, get(func, Function, parentScope));
-            printf("localscope\n");
-            println(get(func, Function, parentScope));
-            println(localScope);
+	    if (opt_v) {
+		printf("localscope\n");
+		println(get(func, Function, parentScope));
+		println(localScope);
+	    }
             return eval(localScope, get(func, Function, body));
         }
         return get(func, Function, primitive)(args);
@@ -408,44 +614,79 @@ oop eval(oop scope, oop ast)
     case t_string: {
         return map_get(ast, value_symbol);
     }
-    case t_add: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
-        return makeInteger(getInteger(lhs) + getInteger(rhs));
+	case t_logor: {
+	    oop lhs = map_get(ast, lhs_symbol);
+	    oop rhs = map_get(ast, rhs_symbol);
+	    if (isTrue(eval(scope, lhs))) return makeInteger(1);
+	    if (isTrue(eval(scope, rhs))) return makeInteger(1);
+	    return makeInteger(0);
+	}
+	case t_logand: {
+	    oop lhs = map_get(ast, lhs_symbol);
+	    oop rhs = map_get(ast, rhs_symbol);
+	    if (isFalse(eval(scope, lhs))) return makeInteger(0);
+	    if (isFalse(eval(scope, rhs))) return makeInteger(0);
+	    return makeInteger(1);
+	}
+# define BINARY(NAME, OPERATOR)						\
+    case t_##NAME: {							\
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));		\
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));		\
+        return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));	\
     }
-    case t_sub: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
-        return makeInteger(getInteger(lhs) - getInteger(rhs));
+	BINARY(bitor,     | );
+	BINARY(bitxor,    ^ );
+	BINARY(bitand,    & );
+	BINARY(equal,     ==);
+	BINARY(noteq,     !=);
+	BINARY(less,      < );
+	BINARY(lesseq,    <=);
+	BINARY(greatereq, >=);
+	BINARY(greater,   > );
+	BINARY(shleft,    <<);
+	BINARY(shright,   >>);
+	BINARY(add,       + );
+	BINARY(sub,       - );
+	BINARY(mul,       * );
+	BINARY(div,       / );
+	BINARY(mod,       % );
+# undef BINARY
+# define UNARY(NAME, OPERATOR)					\
+    case t_##NAME: {						\
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));	\
+        return makeInteger(OPERATOR getInteger(rhs));		\
     }
-    case t_mul: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
-        return makeInteger(getInteger(lhs) * getInteger(rhs));
+	UNARY(not, !);
+	UNARY(neg, -);
+	UNARY(com, ~);
+# undef UNARY
     }
-    case t_div: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
-        return makeInteger(getInteger(lhs) / getInteger(rhs));
-    }
-    case t_mod: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));
-        return makeInteger(getInteger(lhs) % getInteger(rhs));
-    }
-    default: {
-        assert(0);
-        break;
-    }
-    }
+    printf("EVAL ");
+    println(ast);
+    assert(0);
     return null;
 }
 
 oop prim_exit(oop params)
 {
-    printf("bye bye with params ");
-    println(params);
-    exit(0);
+    int status= 0;
+    if (map_hasIntegerKey(params, 0)) {
+	oop arg= get(params, Map, elements)[0].value;
+	if (is(Integer, arg)) status= get(arg, Integer, value);
+    }
+    exit(status);
+}
+
+oop prim_print(oop params)
+{
+    assert(is(Map, params));
+    for (int i= 0;  i < get(params, Map, size);  ++i) {
+	oop key= get(params, Map, elements)[i].key;
+	if (!is(Integer, key) || (i != get(key, Integer, value))) break;
+	print(get(params, Map, elements)[i].value);
+    }
+    printf("\n");
+    return params;
 }
 
 oop evalArgs(oop scope, oop args)
@@ -462,10 +703,23 @@ oop evalArgs(oop scope, oop args)
 
 int main(int argc, char **argv)
 {
+# if (USE_GC)
+    GC_INIT();
+# endif
+
+    while (argc-- > 1) {
+	++argv;
+	if (!strcmp(*argv, "-v"))  ++opt_v;
+	else {
+	    fprintf(stderr, "unknown option: %s\n", *argv);
+	}
+    }
+
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit"), makeFunction(prim_exit, null, null, globals));
+    map_set(globals, intern("exit") , makeFunction(prim_exit,  null, null, globals));
+    map_set(globals, intern("print"), makeFunction(prim_print, null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
@@ -502,9 +756,8 @@ int main(int argc, char **argv)
     println(getVariable(mySecond, myPizzaSymbol));
     */
 
-
     while (yyparse()) {
-        println(yylval);
+        if (opt_v) println(yylval);
         println(eval(globals, yylval));
     }
 
