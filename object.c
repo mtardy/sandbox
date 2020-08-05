@@ -3,7 +3,7 @@
 #include <sysexits.h>
 #include <assert.h>
 
-#define USE_TAG  1
+#define USE_TAG  0
 
 #define USE_GC   1
 
@@ -131,16 +131,15 @@ int isInteger(oop obj)
 #endif
 }
 
+#if (USE_TAG)
+# define getType(PTR)	(((intptr_t)(PTR) & 1) ? Integer : (PTR)->type)
+#else
 type_t getType(oop ptr)
 {
     assert(ptr);
-#if (USE_TAG)
-    if (isInteger(ptr)) {
-        return Integer;
-    }
-#endif
     return ptr->type;
 }
+#endif
 
 int is(type_t type, oop obj)
 {
@@ -150,10 +149,10 @@ int is(type_t type, oop obj)
 oop _checkType(oop ptr, type_t type, char *file, int line)
 {
     assert(ptr);
-    if (ptr->type != type) {
+    if (getType(ptr) != type) {
         fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, ptr->type);
     }
-    assert(ptr->type == type);
+    assert(getType(ptr) == type);
     return ptr;
 }
 
@@ -379,7 +378,7 @@ void map_print(oop map, int ident)
         print(get(map, Map, elements)[i].key);
         printf(": ");
         oop rhs = get(map, Map, elements)[i].value;
-        if (rhs->type == Map) {
+        if (getType(rhs) == Map) {
             map_print(rhs, ident + 1);
         } else {
             print(rhs);
@@ -392,7 +391,7 @@ void map_print(oop map, int ident)
 void print(oop ast)
 {
     assert(ast);
-    switch (ast->type) {
+    switch (getType(ast)) {
     case Undefined:
         printf("null");
         return;
