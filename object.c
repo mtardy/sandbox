@@ -219,9 +219,9 @@ int oopcmp(oop a, oop b)
         case String:
             return strcmp(get(a, String, value), get(b, String, value));
         default:
-        if (a < b) return -1;
-        if (a > b) return  1;
-        return 0;
+            if (a < b) return -1;
+            if (a > b) return  1;
+            return 0;
         }
     }
     return ta - tb;

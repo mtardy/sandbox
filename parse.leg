@@ -299,7 +299,8 @@ YYSTYPE yylval;
 
 start   = - e:stmt                                           { yylval = e }
 
-stmt    =   e:exp SEMICOLON*                                 { $$= e }
+stmt    =   e:exp SEMICOLON*                                 { $$ = e }
+        |   s:compoundStatement                              { $$ = newCompoundStatement(s) }
 
 exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
@@ -308,14 +309,13 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   IF        LPAREN c:exp RPAREN t:stmt ELSE f:stmt { $$ = newIf(c, t, f   ) }
         |   IF        LPAREN c:exp RPAREN t:stmt             { $$ = newIf(c, t, null) }
         |   WHILE LPAREN c:exp RPAREN e:stmt                 { $$ = newWhile(c, e) }
-        |   s:compoundStatement                              { $$ = newCompoundStatement(s) }
         |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
         |       c:cond                                       { $$ = c }
 
 compoundStatement   = LCB  m:makeMap
-                      ( e:exp                                { map_append(m, e) }
+                      ( s:stmt                               { map_append(m, s) }
                       ) *
                       RCB                                    { $$ = m }
 
@@ -707,10 +707,8 @@ oop prim_exit(oop params)
 oop prim_print(oop params)
 {
     assert(is(Map, params));
-    for (int i= 0;  i < get(params, Map, size);  ++i) {
-    oop key= get(params, Map, elements)[i].key;
-    if (!is(Integer, key) || (i != get(key, Integer, value))) break;
-    print(get(params, Map, elements)[i].value);
+    for (int i= 0; map_hasIntegerKey(params, i);  ++i) {
+        print(get(params, Map, elements)[i].value);
     }
     printf("\n");
     return params;
