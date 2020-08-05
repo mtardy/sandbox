@@ -11,11 +11,5 @@ parse: parse.c object.c
 parse.c: parse.leg
 	$(LEG) -o parse.c parse.leg
 
-calc.c: calc.leg
-	$(LEG) -o calc.c calc.leg
-
-obj: drafts/draft_object.c
-	$(CC) -o draft drafts/draft_object.c $(LDLIBS)
-
 clean:
-	rm calc.c calc draft
+	rm parse parse.c
