@@ -1,0 +1,6 @@
+var a = 2
+fun f() {
+   var a = 10
+}
+a
+f()

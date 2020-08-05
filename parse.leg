@@ -480,14 +480,9 @@ SQUOTE  =    "'"                -
 %%
 ;
 
-int getInteger(oop obj)
-{
-    return get(obj, Integer, value);
-}
-
 int isFalse(oop obj)
 {
-    return obj == null || (is(Integer, obj) && (0 == get(obj, Integer, value)));
+    return obj == null || (isInteger(obj) && (0 == getInteger(obj)));
 }
 
 int isTrue(oop obj)
@@ -699,7 +694,7 @@ oop prim_exit(oop params)
     int status= 0;
     if (map_hasIntegerKey(params, 0)) {
     oop arg= get(params, Map, elements)[0].value;
-    if (is(Integer, arg)) status= get(arg, Integer, value);
+    if (isInteger(arg)) status= getInteger(arg);
     }
     exit(status);
 }

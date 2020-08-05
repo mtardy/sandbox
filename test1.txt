@@ -1,6 +1,22 @@
-var a = 20
-{
-    var a = 10
-    a
+fun sieve(n) {
+    var isPrime= {};
+    var i= 0;
+    while (i < n) {
+        isPrime[i]= 1;
+	i= i+1;
+    }
+    i= 2;
+    while (i < n) {
+        if (isPrime[i]) {
+	    print(i);
+	    var j= i+i;
+	    while (j < n) {
+	        isPrime[j]= 0;
+		j= j + i;
+	    }
+	}
+	i = i + 1;
+    }
 }
-a
+
+sieve(100);

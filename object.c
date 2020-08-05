@@ -3,6 +3,8 @@
 #include <sysexits.h>
 #include <assert.h>
 
+#define USE_TAG  1
+
 #define USE_GC   1
 
 #if (USE_GC)
@@ -66,7 +68,7 @@ struct Undefined {
 
 struct Integer {
     type_t type;
-    int value;
+    int _value;
 };
 
 struct String {
@@ -120,9 +122,23 @@ union object {
 union object _null = {.Undefined = {Undefined}};
 oop null = &_null;
 
+int isInteger(oop obj)
+{
+#if (USE_TAG)
+    return (intptr_t)obj & 1;
+#else
+    return is(Integer, obj);
+#endif
+}
+
 type_t getType(oop ptr)
 {
     assert(ptr);
+#if (USE_TAG)
+    if (isInteger(ptr)) {
+        return Integer;
+    }
+#endif
     return ptr->type;
 }
 
@@ -157,12 +173,26 @@ void *memcheck(void *ptr)
 void print(oop ast);
 void println(oop ast);
 
+
+int getInteger(oop obj)
+{
+#if (USE_TAG)
+    return (intptr_t)obj >> 1;
+#else
+    return get(obj, Integer, _value);
+#endif
+}
+
 oop makeInteger(int value)
 {
+#if (USE_TAG)
+    return (oop) (((intptr_t)value << 1) | 1);
+#else
     oop newInt = memcheck(malloc(sizeof(union object)));
     newInt->type = Integer;
-    newInt->Integer.value = value;
+    newInt->Integer._value = value;
     return newInt;
+#endif
 }
 
 oop makeString(char *value)
@@ -205,8 +235,8 @@ bool map_hasIntegerKey(oop map, size_t index)
 {
     if (index >= get(map, Map, size)) return 0;
     oop key= get(map, Map, elements)[index].key;
-    if (!is(Integer, key)) return 0;
-    return index == get(key, Integer, value);
+    if (!isInteger(key)) return 0;
+    return index == getInteger(key);
 }
 
 int oopcmp(oop a, oop b)
@@ -215,7 +245,7 @@ int oopcmp(oop a, oop b)
     if (ta == tb) {
         switch (getType(a)) {
         case Integer:
-            return get(a, Integer, value) - get(b, Integer, value);
+            return getInteger(a) - getInteger(b);
         case String:
             return strcmp(get(a, String, value), get(b, String, value));
         default:
@@ -234,8 +264,8 @@ ssize_t map_search(oop map, oop key)
 
     ssize_t r = get(map, Map, size) - 1;
 
-    if (is(Integer, key)) {
-        ssize_t index = get(key, Integer, value);
+    if (isInteger(key)) {
+        ssize_t index = getInteger(key);
         if (index > r) {
             return -1 - (r + 1);
         }
@@ -367,7 +397,7 @@ void print(oop ast)
         printf("null");
         return;
     case Integer:
-        printf("%i", get(ast, Integer, value));
+        printf("%i", getInteger(ast));
         return;
     case String:
         printf("'%s'", get(ast, String, value));
