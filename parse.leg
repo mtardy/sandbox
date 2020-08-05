@@ -7,7 +7,7 @@
  */
 
 #define DO_PROTOS()													\
-    _DO(map) _DO(if) _DO(while) _DO(call) _DO(func) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string)	\
+    _DO(map) _DO(if) _DO(while) _DO(call) _DO(func) _DO(compoundStatement) _DO(declaration) _DO(assign) _DO(symbol) _DO(integer) _DO(string)	\
     _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)								\
     _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)			\
     _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)						\
@@ -251,6 +251,13 @@ oop newCall(oop func, oop args)
     return call;
 }
 
+oop newCompoundStatement(oop statements)
+{
+    oop obj = newObject(compoundStatement_proto);
+    map_set(obj, statements_symbol, statements);
+    return obj;
+}
+
 // this always creates the key in "object"
 oop newVariable(oop object, oop key, oop value)
 {
@@ -300,10 +307,17 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
 	|   IF 	  LPAREN c:exp RPAREN t:stmt ELSE f:stmt     { $$ = newIf(c, t, f   ) }
 	|   IF 	  LPAREN c:exp RPAREN t:stmt		     { $$ = newIf(c, t, null) }
 	|   WHILE LPAREN c:exp RPAREN e:stmt		     { $$ = newWhile(c, e) }
+        |   s:compoundStatement                                 { $$ = newCompoundStatement(s) }
+
         |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
         |       c:cond                                       { $$ = c }
+
+compoundStatement    = LCB  m:makeMap
+                      ( e:exp                                { map_append(m, e) }
+                      ) *
+                      RCB                                 { $$ = m }
 
 cond    =   c:logor QUERY t:exp COLON f:cond		     { $$ = newIf(c, t, f) }
 	|   logor
@@ -586,6 +600,19 @@ oop eval(oop scope, oop ast)
             return eval(localScope, get(func, Function, body));
         }
         return get(func, Function, primitive)(args);
+    }
+    case t_compoundStatement: {
+        oop statements = map_get(ast, statements_symbol);
+        int i = 0;
+        oop index;
+        oop statement, res;
+        oop localScope = newObject(scope);
+        while ((index = makeInteger(i)), map_hasKey(statements, index)) {
+            statement = map_get(statements, index);
+            res = eval(localScope, statement);
+            i++;
+        }
+        return res;
     }
     case t_getMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
