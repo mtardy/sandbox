@@ -219,9 +219,9 @@ int oopcmp(oop a, oop b)
         case String:
             return strcmp(get(a, String, value), get(b, String, value));
         default:
-	    if (a < b) return -1;
-	    if (a > b) return  1;
-	    return 0;
+        if (a < b) return -1;
+        if (a > b) return  1;
+        return 0;
         }
     }
     return ta - tb;
@@ -240,7 +240,7 @@ ssize_t map_search(oop map, oop key)
             return -1 - (r + 1);
         }
         oop probe = get(map, Map, elements)[index].key;
-	if (key == probe) return index;
+    if (key == probe) return index;
     }
 
     ssize_t l = 0;
