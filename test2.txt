@@ -1,6 +1,10 @@
-var a = 2
 fun f() {
-   var a = 10
+    if (1) {
+        return 12
+        15
+    } else {
+        return 13
+        14
+    }
 }
-a
 f()

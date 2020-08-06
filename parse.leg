@@ -12,7 +12,8 @@
     _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                           \
     _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)    \
     _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                             \
-    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
+    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                           \
+    _DO(return)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -259,6 +260,13 @@ oop newCompoundStatement(oop statements)
     return obj;
 }
 
+oop newReturn(oop exp)
+{
+    oop obj = newObject(return_proto);
+    map_set(obj, value_symbol, exp);
+    return obj;
+}
+
 // this always creates the key in "object"
 oop newVariable(oop object, oop key, oop value)
 {
@@ -309,6 +317,8 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   IF        LPAREN c:exp RPAREN t:stmt ELSE f:stmt { $$ = newIf(c, t, f   ) }
         |   IF        LPAREN c:exp RPAREN t:stmt             { $$ = newIf(c, t, null) }
         |   WHILE LPAREN c:exp RPAREN e:stmt                 { $$ = newWhile(c, e) }
+        |   RETURN                                    e:exp  { $$ = newReturn(e) }
+        |   RETURN                                           { $$ = newReturn(null) }
         |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
@@ -441,6 +451,7 @@ WHILE   =    'while'    ![a-zA-Z0-9_]     -
 IF      =    'if'       ![a-zA-Z0-9_]     -
 ELSE    =    'else'     ![a-zA-Z0-9_]     -
 NULL    =    'null'     ![a-zA-Z0-9_]     -
+RETURN  =    'return'   ![a-zA-Z0-9_]     -
 HASH    =    '#'                -
 LOGOR   =    '||'               -
 LOGAND  =    '&&'               -
@@ -604,10 +615,29 @@ oop eval(oop scope, oop ast)
         oop localScope = newObject(scope);
         while ((index = makeInteger(i)), map_hasKey(statements, index)) {
             statement = map_get(statements, index);
+
+            // RETURN STUFF
+            oop proto = map_get(statement, __proto___symbol);
+            proto_t proto_number = 0;
+            if (proto != null) {
+                proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
+            }
+            // we are doing the work twice because the eval cannot return a special case to signal that it's a return statement
+
             res = eval(localScope, statement);
+
+            // RETURN STUFF
+            if (proto_number == t_return) {
+                break;
+            }
+
             i++;
         }
         return res;
+    }
+    case t_return: {
+        oop exp = eval(scope, map_get(ast, value_symbol));
+        return exp;
     }
     case t_getMember: {
         oop map = eval(scope, map_get(ast, map_symbol));

@@ -3,7 +3,7 @@
 #include <sysexits.h>
 #include <assert.h>
 
-#define USE_TAG  0
+#define USE_TAG  1
 
 #define USE_GC   1
 
