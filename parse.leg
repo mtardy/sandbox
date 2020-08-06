@@ -6,12 +6,12 @@
  * run:        echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS()												\
-    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration) _DO(assign)	\
-    _DO(map) _DO(symbol) _DO(integer) _DO(string)								\
-    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)							\
-    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)		\
-    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)					\
+#define DO_PROTOS()                                                                                                 \
+    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration) _DO(assign)     \
+    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                                   \
+    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                                       \
+    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)                \
+    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                                         \
     _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
@@ -28,9 +28,9 @@ DO_PROTOS()
 // this is the global scope
 oop globals= 0;
 
-#define DO_SYMBOLS()													\
-     DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__)								\
-    _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)			\
+#define DO_SYMBOLS()                                                                                            \
+     DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__)                                                  \
+    _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise) _DO(update)
 
 #define _DO(NAME) oop NAME##_symbol;
@@ -170,40 +170,40 @@ char *unescape(char *s)
     char *t= strdup(s);
     int in= 0, out= 0, c= 0;
     while (0 != (c= t[in++])) {
-	if ('\\' == c && 0 != (c= t[in])) {
-	    ++in;
-	    switch (c) {
-		case 'a': c= '\a'; break;
-		case 'b': c= '\b'; break;
-		case 'e': c= '\e'; break;
-		case 'f': c= '\f'; break;
-		case 'n': c= '\n'; break;
-		case 'r': c= '\r'; break;
-		case 't': c= '\t'; break;
-		case 'v': c= '\v'; break;
-		case '0'...'7': {
-		    c -= '0';
-		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
-		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
-		    break;
-		}
-		case 'x': {
-		    c= 0;
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    break;
-		}
-		case 'u': {
-		    c= 0;
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
-		    break;
-		}
-	    }
-	}
-	t[out++]= c;
+    if ('\\' == c && 0 != (c= t[in])) {
+        ++in;
+        switch (c) {
+        case 'a': c= '\a'; break;
+        case 'b': c= '\b'; break;
+        case 'e': c= '\e'; break;
+        case 'f': c= '\f'; break;
+        case 'n': c= '\n'; break;
+        case 'r': c= '\r'; break;
+        case 't': c= '\t'; break;
+        case 'v': c= '\v'; break;
+        case '0'...'7': {
+            c -= '0';
+            if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+            if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+            break;
+        }
+        case 'x': {
+            c= 0;
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            break;
+        }
+        case 'u': {
+            c= 0;
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+            break;
+        }
+        }
+    }
+    t[out++]= c;
     }
     t[out]= 0;
     return t;
@@ -334,7 +334,7 @@ YYSTYPE yylval;
 start   = - e:stmt                                           { yylval = e }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
-        |   s:block                              	     { $$ = newBlock(s) }
+        |   s:block                                          { $$ = newBlock(s) }
 
 exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
@@ -560,65 +560,65 @@ oop map_zip(oop keys, oop values)
 oop fold(oop ast)
 {
     if (is(Map, ast)) {
-	oop proto= map_get(ast, __proto___symbol);
-	if (null != proto) {
-	    proto_t proto_number= get(map_get(proto, __name___symbol), Symbol, prototype);
-	    switch (proto_number) {
-		case t_integer:
-		case t_string:
-		case t_symbol: {
-		    return map_get(ast, value_symbol);
-		}
-		case t_logor: {
-		    oop lhs= map_get(ast, lhs_symbol);
-		    oop rhs= map_get(ast, rhs_symbol);
-		    if (isTrue(fold(lhs))) return makeInteger(1);
-		    if (isTrue(fold(rhs))) return makeInteger(1);
-		    return makeInteger(0);
-		}
-		case t_logand: {
-		    oop lhs= map_get(ast, lhs_symbol);
-		    oop rhs= map_get(ast, rhs_symbol);
-		    if (isFalse(fold(lhs))) return makeInteger(0);
-		    if (isFalse(fold(rhs))) return makeInteger(0);
-		    return makeInteger(1);
-		}
-#             define BINARY(NAME, OPERATOR)						\
-		case t_##NAME: {							\
-		    oop lhs= fold(map_get(ast, lhs_symbol));				\
-		    oop rhs= fold(map_get(ast, rhs_symbol));				\
-		    return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));	\
-		}
-		BINARY(bitor,     | );
-		BINARY(bitxor,    ^ );
-		BINARY(bitand,    & );
-		BINARY(equal,     ==);
-		BINARY(noteq,     !=);
-		BINARY(less,      < );
-		BINARY(lesseq,    <=);
-		BINARY(greatereq, >=);
-		BINARY(greater,   > );
-		BINARY(shleft,    <<);
-		BINARY(shright,   >>);
-		BINARY(add,       + );
-		BINARY(sub,       - );
-		BINARY(mul,       * );
-		BINARY(div,       / );
-		BINARY(mod,       % );
+    oop proto= map_get(ast, __proto___symbol);
+    if (null != proto) {
+        proto_t proto_number= get(map_get(proto, __name___symbol), Symbol, prototype);
+        switch (proto_number) {
+        case t_integer:
+        case t_string:
+        case t_symbol: {
+            return map_get(ast, value_symbol);
+        }
+        case t_logor: {
+            oop lhs= map_get(ast, lhs_symbol);
+            oop rhs= map_get(ast, rhs_symbol);
+            if (isTrue(fold(lhs))) return makeInteger(1);
+            if (isTrue(fold(rhs))) return makeInteger(1);
+            return makeInteger(0);
+        }
+        case t_logand: {
+            oop lhs= map_get(ast, lhs_symbol);
+            oop rhs= map_get(ast, rhs_symbol);
+            if (isFalse(fold(lhs))) return makeInteger(0);
+            if (isFalse(fold(rhs))) return makeInteger(0);
+            return makeInteger(1);
+        }
+#             define BINARY(NAME, OPERATOR)                                 \
+        case t_##NAME: {                                                    \
+            oop lhs= fold(map_get(ast, lhs_symbol));                        \
+            oop rhs= fold(map_get(ast, rhs_symbol));                        \
+            return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
+        }
+        BINARY(bitor,     | );
+        BINARY(bitxor,    ^ );
+        BINARY(bitand,    & );
+        BINARY(equal,     ==);
+        BINARY(noteq,     !=);
+        BINARY(less,      < );
+        BINARY(lesseq,    <=);
+        BINARY(greatereq, >=);
+        BINARY(greater,   > );
+        BINARY(shleft,    <<);
+        BINARY(shright,   >>);
+        BINARY(add,       + );
+        BINARY(sub,       - );
+        BINARY(mul,       * );
+        BINARY(div,       / );
+        BINARY(mod,       % );
 #             undef BINARY
-#             define UNARY(NAME, OPERATOR)				\
-		case t_##NAME: {					\
-		    oop rhs = fold(map_get(ast, rhs_symbol));		\
-		    return makeInteger(OPERATOR getInteger(rhs));	\
-		}
-		UNARY(not, !);
-		UNARY(neg, -);
-		UNARY(com, ~);
+#             define UNARY(NAME, OPERATOR)                  \
+        case t_##NAME: {                                    \
+            oop rhs = fold(map_get(ast, rhs_symbol));       \
+            return makeInteger(OPERATOR getInteger(rhs));   \
+        }
+        UNARY(not, !);
+        UNARY(neg, -);
+        UNARY(com, ~);
 #             undef UNARY
-		default:
-		    break;
-	    }
-	}
+        default:
+            break;
+        }
+    }
     }
     printf("illegal value in constant expression: ");
     println(ast);
@@ -699,16 +699,16 @@ oop eval(oop scope, oop ast)
         oop labels     = map_get(ast, labels_symbol );
         oop statements = map_get(ast, statements_symbol );
         oop result     = eval(scope, expression);
-	oop label      = map_get(labels, result);
-	if (null == label) label= map_get(labels, __default___symbol);
-	if (null == label) return result;
-	assert(isInteger(label));
-	int limit= map_size(statements);
-	for (int i= getInteger(label);  i < limit;  ++i) {
-	    assert(map_hasIntegerKey(statements, i));
-	    result= eval(scope, get(statements, Map, elements)[i].value);
-	}
-        return result;
+        oop label      = map_get(labels, result);
+        if (null == label) label= map_get(labels, __default___symbol);
+        if (null == label) return result;
+        assert(isInteger(label));
+        int limit= map_size(statements);
+        for (int i= getInteger(label);  i < limit;  ++i) {
+            assert(map_hasIntegerKey(statements, i));
+            result= eval(scope, get(statements, Map, elements)[i].value);
+        }
+            return result;
     }
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -730,11 +730,11 @@ oop eval(oop scope, oop ast)
     }
     case t_call: {
         oop func = eval(scope, map_get(ast, func_symbol));
-	if (!is(Function, func)) {
-	    printf("cannot call ");
-	    println(func);
-	    exit(1);
-	}
+        if (!is(Function, func)) {
+            printf("cannot call ");
+            println(func);
+            exit(1);
+        }
         oop args = evalArgs(scope, map_get(ast, args_symbol));
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
@@ -803,11 +803,11 @@ oop eval(oop scope, oop ast)
         if (isFalse(eval(scope, rhs))) return makeInteger(0);
         return makeInteger(1);
     }
-# define BINARY(NAME, OPERATOR)						\
-    case t_##NAME: {							\
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));		\
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));		\
-        return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));	\
+# define BINARY(NAME, OPERATOR)                                         \
+    case t_##NAME: {                                                    \
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));                \
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));                \
+        return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
     }
     BINARY(bitor,     | );
     BINARY(bitxor,    ^ );

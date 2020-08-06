@@ -134,7 +134,7 @@ int isInteger(oop obj)
 }
 
 #if (USE_TAG)
-# define getType(PTR)	(((intptr_t)(PTR) & 1) ? Integer : (PTR)->type)
+# define getType(PTR) (((intptr_t)(PTR) & 1) ? Integer : (PTR)->type)
 #else
 type_t getType(oop ptr)
 {
