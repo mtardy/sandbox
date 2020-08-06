@@ -55,8 +55,67 @@ fun f(n) if (n < 2) 1 else 1 + f(n-1) + f(n-2)
 
 f(15)
 
+fun f() {
+    var i = 0;
+    while (i < 10) print(i = i + 1);
+}
+
 /* multi
    line
    comment */
+
+var i = 0;
+while (i < 1000000) i = i + 1;
+
+do print(i); while ((i = i + 1) < 10);
+i= 5;
+do print(i); while ((i = i + 1) < 10);
+
+for (var x= 100;  x < 105;  x= x + 1) print(x);
+
+print(x);
+
+for (i= 200;  i < 205;  i= i + 1) print(i);
+
+print(i);
+
+switch (3) {
+   case 0: print('zero');
+   case 1: print('one');
+   case 2: print('two');
+   case 3: print('three');
+   case 4: print('four');
+   case 5: print('five');
+}
+
+switch (#three) {
+   case #zero:  print(0);
+   case #one:   print(1);
+   case #two:   print(2);
+   case #three: print(3);
+   case #four:  print(4);
+   case #five:  print(5);
+}
+
+switch (#nine) {
+   case #zero:  print(0);
+   case #one:   print(1);
+   case #two:   print(2);
+   case #three: print(3);
+   case #four:  print(4);
+   case #five:  print(5);
+}
+
+switch (#nine) {
+   case #zero:  print(0);
+   case #one:   print(1);
+   case #two:   print(2);
+   case #three: print(3);
+   case #four:  print(4);
+   default:     print(666);
+   case #five:  print(5);
+}
+
+print('newline\nanother\012another\x0aanother\u000a')
 
 print('\nmoriturus te saluto\n') && exit(0)

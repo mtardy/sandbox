@@ -122,6 +122,8 @@ union object {
 union object _null = {.Undefined = {Undefined}};
 oop null = &_null;
 
+int is(type_t type, oop obj);
+
 int isInteger(oop obj)
 {
 #if (USE_TAG)
@@ -230,9 +232,14 @@ oop makeMap()
     return newMap;
 }
 
+size_t map_size(oop map)
+{
+    return get(map, Map, size);
+}
+
 bool map_hasIntegerKey(oop map, size_t index)
 {
-    if (index >= get(map, Map, size)) return 0;
+    if (index >= map_size(map)) return 0;
     oop key= get(map, Map, elements)[index].key;
     if (!isInteger(key)) return 0;
     return index == getInteger(key);
@@ -261,7 +268,7 @@ ssize_t map_search(oop map, oop key)
     assert(is(Map, map));
     assert(key);
 
-    ssize_t r = get(map, Map, size) - 1;
+    ssize_t r = map_size(map) - 1;
 
     if (isInteger(key)) {
         ssize_t index = getInteger(key);
@@ -307,25 +314,25 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
     assert(is(Map, map));
     assert(key);
     assert(value);
-    if (pos > get(map, Map, size)) { // don't need to check for pos < 0 because size_t is unsigned
+    if (pos > map_size(map)) { // don't need to check for pos < 0 because size_t is unsigned
         fprintf(stderr, "\nTrying to insert in a map out of bound\n");
         assert(-1);
     }
 
     // check capacity and expand if needed
-    if (get(map, Map, size) >= get(map, Map, capacity)) {
+    if (map_size(map) >= get(map, Map, capacity)) {
         size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
         set(map, Map, elements, memcheck(realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity)));
         set(map, Map, capacity, newCapacity);
     }
 
     // insert
-    memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * (get(map, Map, size) - pos));
+    memmove(get(map, Map, elements) + pos + 1, get(map, Map, elements) + pos, sizeof(struct Pair) * (map_size(map) - pos));
     // Maybe this syntax is not very nice and I should access the Pair stuff differently?
     // I mean modifying something on a line that begin with "get"... :/
     get(map, Map, elements)[pos].value = value;
     get(map, Map, elements)[pos].key = key;
-    set(map, Map, size, get(map, Map, size) + 1);
+    set(map, Map, size, map_size(map) + 1);
 
     return value;
 }
@@ -351,16 +358,16 @@ oop map_del(oop map, oop key)
     assert(is(String, key));
     ssize_t pos = map_search(map, key);
     if (pos < 0) return map;
-    if (pos < get(map, Map, size) - 1) {
-        memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * (get(map, Map, size) - pos));
+    if (pos < map_size(map) - 1) {
+        memmove(get(map, Map, elements) + pos, get(map, Map, elements) + pos + 1, sizeof(struct Pair) * (map_size(map) - pos));
     }
-    set(map, Map, size, get(map, Map, size) - 1);
+    set(map, Map, size, map_size(map) - 1);
     return map;
 }
 
 oop map_append(oop map, oop value)
 {
-    return map_set(map, makeInteger(get(map, Map, size)), value);
+    return map_set(map, makeInteger(map_size(map)), value);
 }
 
 void map_print(oop map, int ident)
@@ -369,7 +376,7 @@ void map_print(oop map, int ident)
     if (ident > 1) {
         printf("\n");
     }
-    for (size_t i = 0; i < get(map, Map, size); i++) {
+    for (size_t i = 0; i < map_size(map); i++) {
         for (size_t i = 0; i < ident; i++) {
             printf("|");
             printf("   ");
@@ -383,7 +390,7 @@ void map_print(oop map, int ident)
         } else {
             print(rhs);
         }
-        if (i < get(map, Map, size) - 1) printf(",\n");
+        if (i < map_size(map) - 1) printf(",\n");
     }
     return;
 }
@@ -442,7 +449,7 @@ ssize_t map_intern_search(oop map, char* ident)
 {
     assert(is(Map, map));
     assert(ident);
-    ssize_t l = 0, r = get(map, Map, size) - 1;
+    ssize_t l = 0, r = map_size(map) - 1;
     while (l <= r) {
         ssize_t mid = (l + r) / 2;
         int cmpres = strcmp(get(get(map, Map, elements)[mid].key, Symbol, name), ident);

@@ -6,14 +6,13 @@
  * run:        echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS()                                                                                     \
-    _DO(if) _DO(while) _DO(call) _DO(func) _DO(compoundStatement) _DO(declaration) _DO(assign)          \
-    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                       \
-    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                           \
-    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)    \
-    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                             \
-    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                           \
-    _DO(return)
+#define DO_PROTOS()												\
+    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration) _DO(assign)	\
+    _DO(map) _DO(symbol) _DO(integer) _DO(string)								\
+    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)							\
+    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)		\
+    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)					\
+    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -29,10 +28,10 @@ DO_PROTOS()
 // this is the global scope
 oop globals= 0;
 
-#define DO_SYMBOLS()                                                                                    \
-     DO_PROTOS() _DO(__proto__) _DO(__name__)                                                           \
-    _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)    \
-    _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(statements)
+#define DO_SYMBOLS()													\
+     DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__)								\
+    _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)			\
+    _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise) _DO(update)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -99,6 +98,33 @@ oop newWhile(oop cond, oop body)
     return obj;
 }
 
+oop newDo(oop body, oop cond)
+{
+    oop obj= newObject(do_proto);
+    map_set(obj, body_symbol,      body);
+    map_set(obj, condition_symbol, cond);
+    return obj;
+}
+
+oop newFor(oop init, oop cond, oop step, oop body)
+{
+    oop obj= newObject(for_proto);
+    map_set(obj, initialise_symbol, init);
+    map_set(obj, condition_symbol,  cond);
+    map_set(obj, update_symbol,     step);
+    map_set(obj, body_symbol,       body);
+    return obj;
+}
+
+oop newSwitch(oop expression, oop labels, oop statements)
+{
+    oop obj= newObject(switch_proto);
+    map_set(obj, expression_symbol, expression);
+    map_set(obj, labels_symbol,     labels);
+    map_set(obj, statements_symbol, statements);
+    return obj;
+}
+
 oop newAssign(oop lhs, oop rhs)
 {
     oop assign = newObject(assign_proto);
@@ -123,56 +149,61 @@ oop newInteger(int value)
     return integer;
 }
 
+int digitValue(int c)
+{
+    if (c < '0') return -1;
+    if ('a' <= c && c <= 'z') c -= ('a' - 'A'); // tolower(c)
+    if ('9' < c && c < 'A') return -1;
+    if ('Z' < c) return -1;
+    if (c >= 'A') c -= ('A' - 10); else c -= '0';
+    return c;
+}
+
 int isradix(int r, int c)
 {
-    if (c <  '0') return 0;
-    if (c >= 'a') c -= 'a' - 'A';    // tolower(c)
-    if ('9' < c && c < 'A') return 0;
-    if (c >= 'A') c -= 'A' - 10;
-    return c < r;
+    c= digitValue(c);
+    return 0 <= c && c < r;
 }
 
 char *unescape(char *s)
 {
-    char *t= strdup(s);        // this is garbage collected
+    char *t= strdup(s);
     int in= 0, out= 0, c= 0;
     while (0 != (c= t[in++])) {
-    if ('\\' == c && 0 != (c= t[in++])) {
-        switch (c) {
-        case 'a': c= '\a'; break;
-        case 'b': c= '\b'; break;
-        case 'e': c= '\e'; break;
-        case 'f': c= '\f'; break;
-        case 'n': c= '\n'; break;
-        case 'r': c= '\r'; break;
-        case 't': c= '\t'; break;
-        case 'v': c= '\v'; break;
-        case '0'...'7': {
-            c= c - '0';
-            ++in;
-            if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
-            if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
-            break;
-        }
-        case 'x': {
-            c= 0;
-            ++in;
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            break;
-        }
-        case 'u': {
-            c= 0;
-            ++in;
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            if (isradix(16, t[in])) c= c * 16 + t[in++] - '0';
-            break;
-        }
-        }
-    }
-    t[out++]= c;
+	if ('\\' == c && 0 != (c= t[in])) {
+	    ++in;
+	    switch (c) {
+		case 'a': c= '\a'; break;
+		case 'b': c= '\b'; break;
+		case 'e': c= '\e'; break;
+		case 'f': c= '\f'; break;
+		case 'n': c= '\n'; break;
+		case 'r': c= '\r'; break;
+		case 't': c= '\t'; break;
+		case 'v': c= '\v'; break;
+		case '0'...'7': {
+		    c -= '0';
+		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+		    if (isradix(8, t[in])) c= c * 8 + t[in++] - '0';
+		    break;
+		}
+		case 'x': {
+		    c= 0;
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    break;
+		}
+		case 'u': {
+		    c= 0;
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    if (isradix(16, t[in])) c= c * 16 + digitValue(t[in++]);
+		    break;
+		}
+	    }
+	}
+	t[out++]= c;
     }
     t[out]= 0;
     return t;
@@ -253,17 +284,10 @@ oop newCall(oop func, oop args)
     return call;
 }
 
-oop newCompoundStatement(oop statements)
+oop newBlock(oop statements)
 {
-    oop obj = newObject(compoundStatement_proto);
+    oop obj = newObject(block_proto);
     map_set(obj, statements_symbol, statements);
-    return obj;
-}
-
-oop newReturn(oop exp)
-{
-    oop obj = newObject(return_proto);
-    map_set(obj, value_symbol, exp);
     return obj;
 }
 
@@ -299,6 +323,8 @@ oop setVariable(oop object, oop key, oop value)
     return map_set(object, key, value);
 }
 
+oop fold(oop ast);
+
 #define YYSTYPE oop
 
 YYSTYPE yylval;
@@ -308,7 +334,7 @@ YYSTYPE yylval;
 start   = - e:stmt                                           { yylval = e }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
-        |   s:compoundStatement                              { $$ = newCompoundStatement(s) }
+        |   s:block                              	     { $$ = newBlock(s) }
 
 exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
@@ -316,18 +342,27 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   FUN                           p:paramList e:stmt { $$ = newFunc(null, p, e) }
         |   IF        LPAREN c:exp RPAREN t:stmt ELSE f:stmt { $$ = newIf(c, t, f   ) }
         |   IF        LPAREN c:exp RPAREN t:stmt             { $$ = newIf(c, t, null) }
-        |   WHILE LPAREN c:exp RPAREN e:stmt                 { $$ = newWhile(c, e) }
-        |   RETURN                                    e:exp  { $$ = newReturn(e) }
-        |   RETURN                                           { $$ = newReturn(null) }
+        |   WHILE LPAREN c:exp RPAREN s:stmt                 { $$ = newWhile(c, s) }
+        |   DO s:stmt WHILE LPAREN c:exp RPAREN              { $$ = newDo(s, c) }
+        |   FOR LPAREN i:stmt c:stmt u:exp RPAREN s:stmt     { $$ = newFor(i, c, u, s) }
+        |   s:switch                                         { $$ = s }
         |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
         |       c:cond                                       { $$ = c }
 
-compoundStatement   = LCB  m:makeMap
-                      ( s:stmt                               { map_append(m, s) }
-                      ) *
-                      RCB                                    { $$ = m }
+block   = LCB  m:makeMap
+              ( s:stmt                                       { map_append(m, s) }
+              ) *
+          RCB                                                { $$ = m }
+
+switch  = SWITCH LPAREN e:exp RPAREN
+          LCB statements:makeMap labels:makeMap
+              ( CASE    l:exp  COLON                         { map_set(labels, fold(l), makeInteger(map_size(statements))) }
+              | DEFAULT        COLON                         { map_set(labels, __default___symbol, makeInteger(map_size(statements))) }
+              |         s:stmt                               { map_append(statements, s) }
+              )*
+          RCB                                                { $$= newSwitch(e, labels, statements) }
 
 cond    =   c:logor QUERY t:exp COLON f:cond                 { $$ = newIf(c, t, f) }
         |   logor
@@ -440,53 +475,61 @@ blank   =  [ \t\n\r]
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
 
-IDENT   =    < [a-zA-Z][a-zA-Z0-9_]* >    -   { $$ = intern(yytext) }
-NUMBER  =    '0b' < [01]+        >        -   { $$ = newInteger(strtol(yytext, 0,  2)) }
-        |    '0x' < [0-9a-fA-F]+ >        -   { $$ = newInteger(strtol(yytext, 0, 16)) }
-        |    '0'  < [0-7]+       >        -   { $$ = newInteger(strtol(yytext, 0,  8)) }
-        |         < [0-9]+       >        -   { $$ = newInteger(strtol(yytext, 0, 10)) }
-FUN     =    'fun'      ![a-zA-Z0-9_]     -
-VAR     =    'var'      ![a-zA-Z0-9_]     -
-WHILE   =    'while'    ![a-zA-Z0-9_]     -
-IF      =    'if'       ![a-zA-Z0-9_]     -
-ELSE    =    'else'     ![a-zA-Z0-9_]     -
-NULL    =    'null'     ![a-zA-Z0-9_]     -
-RETURN  =    'return'   ![a-zA-Z0-9_]     -
-HASH    =    '#'                -
-LOGOR   =    '||'               -
-LOGAND  =    '&&'               -
-BITOR   =    '|'    ![|=]       -
-BITXOR  =    '^'    ![=]        -
-BITAND  =    '&'    ![&=]       -
-EQUAL   =    '=='               -
-NOTEQ   =    '!='               -
-LESS    =    '<'    ![<=]       -
-LESSEQ  =    '<='               -
-GREATEREQ =  '>='               -
-GREATER =    '>'    ![>=]       -
-SHLEFT  =    '<<'   ![=]        -
-SHRIGHT =    '>>'   ![=]        -
-PLUS    =    '+'    ![+=]       -
-MINUS   =    '-'    ![-=]       -
-TILDE   =    '~'                -
-PLING   =    '!'    ![=]        -
-MULTI   =    '*'    ![=]        -
-DIVIDE  =    '/'    ![/=]       -
-MODULO  =    '%'    ![=]        -
-ASSIGN  =    '='    ![=]        -
-QUERY   =    '?'                -
-COLON   =    ':'                -
-SEMICOLON =  ';'                -
-COMMA   =    ','                -
-DOT     =    '.'                -
-LCB     =    '{'                -
-RCB     =    '}'                -
-LBRAC   =    '['                -
-RBRAC   =    ']'                -
-LPAREN  =    '('                -
-RPAREN  =    ')'                -
-DQUOTE  =    '"'                -
-SQUOTE  =    "'"                -
+keyword = FUN | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL
+
+IDENT   =    !keyword < [a-zA-Z_][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
+
+NUMBER  =    '0b' < [01]+        >                 -   { $$ = newInteger(strtol(yytext, 0,  2)) }
+        |    '0x' < [0-9a-fA-F]+ >                 -   { $$ = newInteger(strtol(yytext, 0, 16)) }
+        |    '0'  < [0-7]+       >                 -   { $$ = newInteger(strtol(yytext, 0,  8)) }
+        |         < [0-9]+       >                 -   { $$ = newInteger(strtol(yytext, 0, 10)) }
+
+FUN     =    'fun'      ![a-zA-Z0-9_] -
+VAR     =    'var'      ![a-zA-Z0-9_] -
+SWITCH  =    'switch'   ![a-zA-Z0-9_] -
+CASE    =    'case'     ![a-zA-Z0-9_] -
+DEFAULT =    'default'  ![a-zA-Z0-9_] -
+DO      =    'do'       ![a-zA-Z0-9_] -
+FOR     =    'for'      ![a-zA-Z0-9_] -
+WHILE   =    'while'    ![a-zA-Z0-9_] -
+IF      =    'if'       ![a-zA-Z0-9_] -
+ELSE    =    'else'     ![a-zA-Z0-9_] -
+NULL    =    'null'     ![a-zA-Z0-9_] -
+HASH    =    '#'                      -
+LOGOR   =    '||'                     -
+LOGAND  =    '&&'                     -
+BITOR   =    '|'        ![|=]         -
+BITXOR  =    '^'        ![=]          -
+BITAND  =    '&'        ![&=]         -
+EQUAL   =    '=='                     -
+NOTEQ   =    '!='                     -
+LESS    =    '<'        ![<=]         -
+LESSEQ  =    '<='                     -
+GREATEREQ =  '>='                     -
+GREATER =    '>'        ![>=]         -
+SHLEFT  =    '<<'       ![=]          -
+SHRIGHT =    '>>'       ![=]          -
+PLUS    =    '+'        ![+=]         -
+MINUS   =    '-'        ![-=]         -
+TILDE   =    '~'                      -
+PLING   =    '!'        ![=]          -
+MULTI   =    '*'        ![=]          -
+DIVIDE  =    '/'        ![/=]         -
+MODULO  =    '%'        ![=]          -
+ASSIGN  =    '='        ![=]          -
+QUERY   =    '?'                      -
+COLON   =    ':'                      -
+SEMICOLON =  ';'                      -
+COMMA   =    ','                      -
+DOT     =    '.'                      -
+LCB     =    '{'                      -
+RCB     =    '}'                      -
+LBRAC   =    '['                      -
+RBRAC   =    ']'                      -
+LPAREN  =    '('                      -
+RPAREN  =    ')'                      -
+DQUOTE  =    '"'                      -
+SQUOTE  =    "'"                      -
 
 %%
 ;
@@ -501,28 +544,93 @@ int isTrue(oop obj)
     return !isFalse(obj);
 }
 
-oop map_fromArrays(oop keys, oop values)
+oop map_zip(oop keys, oop values)
 {
     assert(is(Map, keys));
     assert(is(Map, values));
-    int i = 0;
-    oop map = makeMap();
-    oop key, value;
-    oop index;
-    while ((index = makeInteger(i)), map_hasKey(keys, index)) {
-        key = map_get(keys, index);
-        value = map_get(values, index);
+    oop map= makeMap();
+    for (int i= 0;  map_hasIntegerKey(keys, i) && map_hasIntegerKey(values, i);  ++i) {
+        oop key   = get(keys,   Map, elements)[i].value;
+        oop value = get(values, Map, elements)[i].value;
         map_set(map, key, value);
-        i++;
     }
     return map;
+}
+
+oop fold(oop ast)
+{
+    if (is(Map, ast)) {
+	oop proto= map_get(ast, __proto___symbol);
+	if (null != proto) {
+	    proto_t proto_number= get(map_get(proto, __name___symbol), Symbol, prototype);
+	    switch (proto_number) {
+		case t_integer:
+		case t_string:
+		case t_symbol: {
+		    return map_get(ast, value_symbol);
+		}
+		case t_logor: {
+		    oop lhs= map_get(ast, lhs_symbol);
+		    oop rhs= map_get(ast, rhs_symbol);
+		    if (isTrue(fold(lhs))) return makeInteger(1);
+		    if (isTrue(fold(rhs))) return makeInteger(1);
+		    return makeInteger(0);
+		}
+		case t_logand: {
+		    oop lhs= map_get(ast, lhs_symbol);
+		    oop rhs= map_get(ast, rhs_symbol);
+		    if (isFalse(fold(lhs))) return makeInteger(0);
+		    if (isFalse(fold(rhs))) return makeInteger(0);
+		    return makeInteger(1);
+		}
+#             define BINARY(NAME, OPERATOR)						\
+		case t_##NAME: {							\
+		    oop lhs= fold(map_get(ast, lhs_symbol));				\
+		    oop rhs= fold(map_get(ast, rhs_symbol));				\
+		    return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));	\
+		}
+		BINARY(bitor,     | );
+		BINARY(bitxor,    ^ );
+		BINARY(bitand,    & );
+		BINARY(equal,     ==);
+		BINARY(noteq,     !=);
+		BINARY(less,      < );
+		BINARY(lesseq,    <=);
+		BINARY(greatereq, >=);
+		BINARY(greater,   > );
+		BINARY(shleft,    <<);
+		BINARY(shright,   >>);
+		BINARY(add,       + );
+		BINARY(sub,       - );
+		BINARY(mul,       * );
+		BINARY(div,       / );
+		BINARY(mod,       % );
+#             undef BINARY
+#             define UNARY(NAME, OPERATOR)				\
+		case t_##NAME: {					\
+		    oop rhs = fold(map_get(ast, rhs_symbol));		\
+		    return makeInteger(OPERATOR getInteger(rhs));	\
+		}
+		UNARY(not, !);
+		UNARY(neg, -);
+		UNARY(com, ~);
+#             undef UNARY
+		default:
+		    break;
+	    }
+	}
+    }
+    printf("illegal value in constant expression: ");
+    println(ast);
+    assert(0);
+    return null;
 }
 
 oop evalArgs(oop scope, oop args);
 
 oop eval(oop scope, oop ast)
 {
-    switch(ast->type) {
+    switch(getType(ast)) {
     case Undefined:
     case Integer:
     case String:
@@ -568,6 +676,40 @@ oop eval(oop scope, oop ast)
         while (isTrue(eval(scope, condition))) result= eval(scope, body);
         return result;
     }
+    case t_do: {
+        oop body      = map_get(ast, body_symbol);
+        oop condition = map_get(ast, condition_symbol );
+        oop result    = null;
+        do { result= eval(scope, body); } while (isTrue(eval(scope, condition)));
+        return result;
+    }
+    case t_for: {
+        oop initialise = map_get(ast, initialise_symbol );
+        oop condition  = map_get(ast, condition_symbol );
+        oop update     = map_get(ast, update_symbol );
+        oop body       = map_get(ast, body_symbol);
+        oop result     = null;
+        oop localScope = newObject(scope);
+        for (eval(localScope, initialise);  isTrue(eval(localScope, condition));  eval(localScope, update))
+            result= eval(localScope, body);
+        return result;
+    }
+    case t_switch: {
+        oop expression = map_get(ast, expression_symbol );
+        oop labels     = map_get(ast, labels_symbol );
+        oop statements = map_get(ast, statements_symbol );
+        oop result     = eval(scope, expression);
+	oop label      = map_get(labels, result);
+	if (null == label) label= map_get(labels, __default___symbol);
+	if (null == label) return result;
+	assert(isInteger(label));
+	int limit= map_size(statements);
+	for (int i= getInteger(label);  i < limit;  ++i) {
+	    assert(map_hasIntegerKey(statements, i));
+	    result= eval(scope, get(statements, Map, elements)[i].value);
+	}
+        return result;
+    }
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
@@ -588,15 +730,15 @@ oop eval(oop scope, oop ast)
     }
     case t_call: {
         oop func = eval(scope, map_get(ast, func_symbol));
-    if (!is(Function, func)) {
-        printf("cannot call ");
-        println(func);
-        exit(1);
-    }
+	if (!is(Function, func)) {
+	    printf("cannot call ");
+	    println(func);
+	    exit(1);
+	}
         oop args = evalArgs(scope, map_get(ast, args_symbol));
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
-            oop localScope = map_fromArrays(param, args);
+            oop localScope = map_zip(param, args);
             map_set(localScope, __proto___symbol, get(func, Function, parentScope));
             if (opt_v) {
                 printf("localscope\n");
@@ -607,7 +749,7 @@ oop eval(oop scope, oop ast)
         }
         return get(func, Function, primitive)(args);
     }
-    case t_compoundStatement: {
+    case t_block: {
         oop statements = map_get(ast, statements_symbol);
         int i = 0;
         oop index;
@@ -615,29 +757,10 @@ oop eval(oop scope, oop ast)
         oop localScope = newObject(scope);
         while ((index = makeInteger(i)), map_hasKey(statements, index)) {
             statement = map_get(statements, index);
-
-            // RETURN STUFF
-            oop proto = map_get(statement, __proto___symbol);
-            proto_t proto_number = 0;
-            if (proto != null) {
-                proto_number = get(map_get(proto, __name___symbol), Symbol, prototype);
-            }
-            // we are doing the work twice because the eval cannot return a special case to signal that it's a return statement
-
             res = eval(localScope, statement);
-
-            // RETURN STUFF
-            if (proto_number == t_return) {
-                break;
-            }
-
             i++;
         }
         return res;
-    }
-    case t_return: {
-        oop exp = eval(scope, map_get(ast, value_symbol));
-        return exp;
     }
     case t_getMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
@@ -680,11 +803,11 @@ oop eval(oop scope, oop ast)
         if (isFalse(eval(scope, rhs))) return makeInteger(0);
         return makeInteger(1);
     }
-# define BINARY(NAME, OPERATOR)                        \
-    case t_##NAME: {                            \
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));        \
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));        \
-        return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));    \
+# define BINARY(NAME, OPERATOR)						\
+    case t_##NAME: {							\
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));		\
+        oop rhs = eval(scope ,map_get(ast, rhs_symbol));		\
+        return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));	\
     }
     BINARY(bitor,     | );
     BINARY(bitxor,    ^ );
@@ -705,7 +828,7 @@ oop eval(oop scope, oop ast)
 # undef BINARY
 # define UNARY(NAME, OPERATOR)                              \
     case t_##NAME: {                                        \
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));    \
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));    \
         return makeInteger(OPERATOR getInteger(rhs));       \
     }
     UNARY(not, !);
@@ -732,7 +855,7 @@ oop prim_exit(oop params)
 oop prim_print(oop params)
 {
     assert(is(Map, params));
-    for (int i= 0; map_hasIntegerKey(params, i);  ++i) {
+    for (int i= 0;  map_hasIntegerKey(params, i);  ++i) {
         print(get(params, Map, elements)[i].value);
     }
     printf("\n");
@@ -792,3 +915,7 @@ int main(int argc, char **argv)
 
     (void)yyAccept;
 }
+
+// Local Variables:
+// indent-tabs-mode: nil
+// End:
