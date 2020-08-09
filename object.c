@@ -272,11 +272,10 @@ ssize_t map_search(oop map, oop key)
 
     if (isInteger(key)) {
         ssize_t index = getInteger(key);
-        if (index > r) {
-            return -1 - (r + 1);
+        if (index <= r) {
+            oop probe = get(map, Map, elements)[index].key;
+            if (key == probe) return index;
         }
-        oop probe = get(map, Map, elements)[index].key;
-    if (key == probe) return index;
     }
 
     ssize_t l = 0;

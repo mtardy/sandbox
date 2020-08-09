@@ -12,7 +12,8 @@
     _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                                       \
     _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)                \
     _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                                         \
-    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)
+    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                                       \
+    _DO(return) _DO(break) _DO(continue)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -24,6 +25,47 @@ DO_PROTOS()
 #define SYMBOL_PAYLOAD proto_t prototype;
 
 #include "object.c"
+
+#include <setjmp.h>
+
+enum jb_t {
+    j_return = 1,
+    j_break,
+    j_continue,
+};
+
+typedef struct jb_record
+{
+    sigjmp_buf        jb;
+    oop               result;
+    struct jb_record *next;
+} jb_record;
+
+jb_record *jbs= NULL;
+
+void jbsCheck(char *msg)
+{
+    if (NULL == jbs) {
+        fprintf(stderr, "\n%s\n", msg);
+        exit(1);
+    }
+}
+
+jb_record *jbRecPush() {
+    jb_record *newJbRec = memcheck(malloc(sizeof(jb_record)));
+    newJbRec->result = null;
+    newJbRec->next = jbs;
+    jbs = newJbRec;
+    return newJbRec;
+}
+
+jb_record *jbRecPop() {
+    assert(jbs);
+    jb_record *head = jbs;
+    jbs = head->next;
+    return head;
+}
+
 
 // this is the global scope
 oop globals= 0;
@@ -291,6 +333,25 @@ oop newBlock(oop statements)
     return obj;
 }
 
+oop newReturn(oop exp)
+{
+    oop obj = newObject(return_proto);
+    map_set(obj, value_symbol, exp);
+    return obj;
+}
+
+oop newBreak(void)
+{
+    oop obj = newObject(break_proto);
+    return obj;
+}
+
+oop newContinue(void)
+{
+    oop obj = newObject(continue_proto);
+    return obj;
+}
+
 // this always creates the key in "object"
 oop newVariable(oop object, oop key, oop value)
 {
@@ -346,6 +407,10 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   DO s:stmt WHILE LPAREN c:exp RPAREN              { $$ = newDo(s, c) }
         |   FOR LPAREN i:stmt c:stmt u:exp RPAREN s:stmt     { $$ = newFor(i, c, u, s) }
         |   s:switch                                         { $$ = s }
+        |   RETURN                                    e:exp  { $$ = newReturn(e) }
+        |   RETURN                                           { $$ = newReturn(null) }
+        |   BREAK                                            { $$ = newBreak() }
+        |   CONTINUE                                         { $$ = newContinue() }
         |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
         |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
         |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
@@ -475,7 +540,7 @@ blank   =  [ \t\n\r]
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
 
-keyword = FUN | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL
+keyword = FUN | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL | RETURN | BREAK | CONTINUE
 
 IDENT   =    !keyword < [a-zA-Z_][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 
@@ -495,6 +560,9 @@ WHILE   =    'while'    ![a-zA-Z0-9_] -
 IF      =    'if'       ![a-zA-Z0-9_] -
 ELSE    =    'else'     ![a-zA-Z0-9_] -
 NULL    =    'null'     ![a-zA-Z0-9_] -
+RETURN  =    'return'   ![a-zA-Z0-9_] -
+BREAK   =    'break'    ![a-zA-Z0-9_] -
+CONTINUE =   'continue' ![a-zA-Z0-9_] -
 HASH    =    '#'                      -
 LOGOR   =    '||'                     -
 LOGAND  =    '&&'                     -
@@ -673,14 +741,61 @@ oop eval(oop scope, oop ast)
         oop condition = map_get(ast, condition_symbol );
         oop body      = map_get(ast, body_symbol);
         oop result    = null;
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                jbsCheck("return outside a function");
+                jbs->result = result;
+                siglongjmp(jbs->jb, j_return);
+                assert(0);
+            }
+            case j_break: {
+                jbRecPop();
+                return null;
+            }
+            case j_continue: {
+                break;
+            }
+        }
+
         while (isTrue(eval(scope, condition))) result= eval(scope, body);
+        jbRecPop();
         return result;
     }
     case t_do: {
         oop body      = map_get(ast, body_symbol);
         oop condition = map_get(ast, condition_symbol );
         oop result    = null;
-        do { result= eval(scope, body); } while (isTrue(eval(scope, condition)));
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                jbsCheck("return outside a function");
+                jbs->result = result;
+                siglongjmp(jbs->jb, j_return);
+                assert(0);
+            }
+            case j_break: {
+                jbRecPop();
+                return null;
+            }
+            case j_continue: {
+                goto restart_do;
+            }
+        }
+
+        do {
+            result= eval(scope, body);
+        restart_do:;
+        } while (isTrue(eval(scope, condition)));
+        jbRecPop();
         return result;
     }
     case t_for: {
@@ -690,8 +805,31 @@ oop eval(oop scope, oop ast)
         oop body       = map_get(ast, body_symbol);
         oop result     = null;
         oop localScope = newObject(scope);
-        for (eval(localScope, initialise);  isTrue(eval(localScope, condition));  eval(localScope, update))
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                jbsCheck("return outside a function");
+                jbs->result = result;
+                siglongjmp(jbs->jb, j_return);
+                assert(0);
+            }
+            case j_break: {
+                jbRecPop();
+                return null;
+            }
+            case j_continue: {
+                goto restart_for;
+            }
+        }
+
+        for (eval(localScope, initialise);  isTrue(eval(localScope, condition));  eval(localScope, update)) {
             result= eval(localScope, body);
+        restart_for:;
+        }
         return result;
     }
     case t_switch: {
@@ -704,11 +842,35 @@ oop eval(oop scope, oop ast)
         if (null == label) return result;
         assert(isInteger(label));
         int limit= map_size(statements);
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                jbsCheck("return outside a function");
+                jbs->result = result;
+                siglongjmp(jbs->jb, j_return);
+                assert(0);
+            }
+            case j_break: {
+                jbRecPop();
+                return null;
+            }
+            case j_continue: {
+                jbRecPop();
+                jbsCheck("continue outside a loop");
+                siglongjmp(jbs->jb, j_continue);
+                assert(0);
+            }
+        }
+
         for (int i= getInteger(label);  i < limit;  ++i) {
             assert(map_hasIntegerKey(statements, i));
             result= eval(scope, get(statements, Map, elements)[i].value);
         }
-            return result;
+        return result;
     }
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -720,10 +882,10 @@ oop eval(oop scope, oop ast)
         oop param = map_get(ast, param_symbol);
         oop body  = map_get(ast, body_symbol);
         oop func  = makeFunction(NULL, param, body, scope);
-    if (opt_v) {
-        printf("funcscope\n");
-        println(scope);
-    }
+        if (opt_v) {
+            printf("funcscope\n");
+            println(scope);
+        }
         if (name != null) newVariable(scope, name, func);
         if (opt_v) println(scope);
         return func;
@@ -735,6 +897,7 @@ oop eval(oop scope, oop ast)
             println(func);
             exit(1);
         }
+
         oop args = evalArgs(scope, map_get(ast, args_symbol));
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
@@ -745,9 +908,43 @@ oop eval(oop scope, oop ast)
                 println(get(func, Function, parentScope));
                 println(localScope);
             }
-            return eval(localScope, get(func, Function, body));
+
+            jbRecPush();
+            int jbt = sigsetjmp(jbs->jb, 0);
+            switch (jbt) {
+                case j_return: {
+                    oop result = jbs->result;
+                    jbRecPop();
+                    return result;
+                }
+                case j_break: {
+                    fprintf(stderr, "\nbreak outside of a loop\n");
+                    exit(1);
+                }
+                case j_continue: {
+                    fprintf(stderr, "\ncontinue outside of a loop\n");
+                    exit(1);
+                }
+            }
+
+            oop result = eval(localScope, get(func, Function, body));
+            jbRecPop();
+            return result;
         }
         return get(func, Function, primitive)(args);
+    }
+    case t_return: {
+        jbsCheck("return outside a function");
+        jbs->result = eval(scope, map_get(ast, value_symbol));
+        siglongjmp(jbs->jb, j_return);
+    }
+    case t_break: {
+        jbsCheck("break outside a loop");
+        siglongjmp(jbs->jb, j_break);
+    }
+    case t_continue: {
+        jbsCheck("continue outside a loop");
+        siglongjmp(jbs->jb, j_continue);
     }
     case t_block: {
         oop statements = map_get(ast, statements_symbol);
