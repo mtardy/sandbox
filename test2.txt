@@ -1,13 +1,16 @@
 fun f() {
     var i = 0
-    while (i<10) {
+    for (var i= 0; i < 10; i = i + 1) {
+        switch (i) {
+            case 5: {
+                continue
+            }
+            case 8: {
+                return 66;
+            }
+        }
         print(i)
-        if (i == 5) {
-            return 42
-        }
-        else {
-            i = i + 1
-        }
     }
+    24 + 2
 }
 f()

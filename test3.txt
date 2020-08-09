@@ -1,0 +1,8 @@
+fun f(n) {
+    if (n < 2) {
+        return 1
+    } else {
+        return 1 + f(n-1) + f(n-2)
+    }
+}
+f(27)

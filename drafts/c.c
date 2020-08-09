@@ -17,24 +17,26 @@ struct jb_record
 
 struct jb_record *jbs= 0;
 
+
 int eval(oop ast)
 {
     case t_call: {
-	pushJbRec();
-	if (0 != set_jmp(jbs->jb)) {
-	    oop result = jbs->result;
-	    popJbRec();
-	    return result;
-	}
-	// run the body of the function here
-	result = (each statement in the func body...);
-	popJbRec();
-	return result;
+    pushJbRec();
+    if (0 != set_jmp(jbs->jb)) {
+        oop result = jbs->result;
+        popJbRec();
+        return result;
+    }
+    // run the body of the function here
+    result = (each statement in the func body...);
+    popJbRec();
+    return result;
     }
     setjmp(jb);
     if (n < 2) return 1;
     return 1 + f(n-1) + f(n-2);
 }
+
 
 int main()
 {
