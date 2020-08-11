@@ -7,7 +7,7 @@
  */
 
 #define DO_PROTOS()                                                                                     \
-    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration)     \
+    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(invoke) _DO(func) _DO(block) _DO(declaration)     \
     _DO(assign) _DO(assignAdd) _DO(assignSub) _DO(assignMul) _DO(assignDiv) _DO(assignMod)              \
     _DO(assignBitor) _DO(assignBitxor) _DO(assignBitand) _DO(assignShleft) _DO(assignShright)           \
     _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                       \
@@ -79,7 +79,8 @@ oop globals= 0;
 #define DO_SYMBOLS()                                                                                            \
      DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__)                                                  \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
-    _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise) _DO(update)
+    _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
+    _DO(update) _DO(this)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -306,6 +307,15 @@ oop newCall(oop func, oop args)
     return call;
 }
 
+oop newInvoke(oop func, oop this, oop args)
+{
+    oop obj = newObject(invoke_proto);
+    map_set(obj, func_symbol, func);
+    map_set(obj, this_symbol, this);
+    map_set(obj, args_symbol, args);
+    return obj;
+}
+
 oop newBlock(oop statements)
 {
     oop obj = newObject(block_proto);
@@ -502,9 +512,9 @@ prefix  =   PLUS   n:prefix             { $$= n }
         |   PLING  n:prefix             { $$= newUnary(not_proto, n) }
         |          n:postfix            { $$= n }
 
-postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, intern("this"), i); i = newCall(i, a) }
-                    | DOT    s:IDENT        !assignOp                  { i = newGetMap(getMember_proto, i, s) }
-                    | LBRAC  p:exp   RBRAC  !assignOp                  { i = newGetMap(getIndex_proto, i, p) }
+postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(s, i, a) }
+                    | DOT    s:IDENT        !assignOp           { i = newGetMap(getMember_proto, i, s) }
+                    | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(getIndex_proto, i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
@@ -921,11 +931,12 @@ oop eval(oop scope, oop ast)
         oop body  = map_get(ast, body_symbol);
         oop func  = makeFunction(NULL, param, body, scope);
         if (opt_v) {
-            printf("funcscope\n");
+            printf("funcscope: ");
+            println(scope);
+            printf("globalScope: ");
             println(scope);
         }
         if (name != null) newVariable(scope, name, func);
-        if (opt_v) println(scope);
         return func;
     }
     case t_call: {
@@ -942,8 +953,9 @@ oop eval(oop scope, oop ast)
             oop localScope = map_zip(param, args);
             map_set(localScope, __proto___symbol, get(func, Function, parentScope));
             if (opt_v) {
-                printf("localscope\n");
+                printf("parentScope: ");
                 println(get(func, Function, parentScope));
+                printf("localScope: ");
                 println(localScope);
             }
 
@@ -971,6 +983,55 @@ oop eval(oop scope, oop ast)
         }
         return get(func, Function, primitive)(args);
     }
+    case t_invoke: {
+        // this is what differs from t_call
+        oop this = eval(scope, map_get(ast, this_symbol));
+        oop func = getVariable(this, map_get(ast, func_symbol));
+        if (!is(Function, func)) {
+            printf("cannot call ");
+            println(func);
+            exit(1);
+        }
+
+        oop args = evalArgs(scope, map_get(ast, args_symbol));
+        if (get(func, Function, primitive) == NULL) {
+            oop param = get(func, Function, param);
+            oop localScope = map_zip(param, args);
+            // and set this in the local scope
+            map_set(localScope, this_symbol, this);
+            map_set(localScope, __proto___symbol, get(func, Function, parentScope));
+            if (opt_v) {
+                printf("parentScope: ");
+                println(get(func, Function, parentScope));
+                printf("localScope: ");
+                println(localScope);
+            }
+
+            jbRecPush();
+            int jbt = sigsetjmp(jbs->jb, 0);
+            switch (jbt) {
+                case j_return: {
+                    oop result = jbs->result;
+                    jbRecPop();
+                    return result;
+                }
+                case j_break: {
+                    fprintf(stderr, "\nbreak outside of a loop\n");
+                    exit(1);
+                }
+                case j_continue: {
+                    fprintf(stderr, "\ncontinue outside of a loop\n");
+                    exit(1);
+                }
+            }
+
+            oop result = eval(localScope, get(func, Function, body));
+            jbRecPop();
+            return result;
+        }
+        return get(func, Function, primitive)(args);
+    }
+
     case t_return: {
         jbsCheck("return outside a function");
         jbs->result = eval(scope, map_get(ast, value_symbol));
