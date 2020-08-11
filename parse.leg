@@ -673,6 +673,34 @@ oop map_zip(oop keys, oop values)
     return map;
 }
 
+oop clone(oop obj)
+{
+    oop clone;
+    switch(getType(obj)) {
+        case Undefined:
+        case Integer:
+        case Function:
+        case Symbol:
+            return obj;
+        case String:
+            fprintf(stderr, "\nTODO: clone strings\n");
+            exit(1);
+        case Map:
+            // please don't mind
+            // COMMENT THE NEXT LINE, FOR TESTING BECAUSE PRIMITIVE FUNCTRION ARE CALLED WITH AN ARRAY OF ARGS
+            // obj = map_get(obj, makeInteger(0));
+            clone = makeMap();
+            // copy the map
+            memcpy(clone, obj, sizeof(struct Map));
+            // allocate memory for elements (capacity)
+            set(clone, Map, elements, memcheck(malloc(sizeof(struct Pair) * get(obj, Map, capacity))));
+            // copy the elements (size)
+            memcpy(get(clone, Map, elements), get(obj, Map, elements), sizeof(struct Pair) * get(obj, Map, size));
+            return clone;
+        }
+    return obj;
+}
+
 oop fold(oop ast)
 {
     if (is(Map, ast)) {
@@ -772,7 +800,14 @@ oop eval(oop scope, oop ast)
         return 0;
     }
     case t_map: {
-        return ast;
+        oop map = clone(ast);
+        oop keys = map_keys(map);
+        oop key;
+        for (size_t i = 0; i < map_size(keys); i++) {
+            key = map_get(keys, makeInteger(i));
+            map_set(map, key, eval(scope, map_get(map, key)));
+        }
+        return map;
     }
     case t_declaration: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -1243,6 +1278,7 @@ int main(int argc, char **argv)
 
     map_set(globals, intern("exit") , makeFunction(prim_exit,  null, null, globals));
     map_set(globals, intern("print"), makeFunction(prim_print, null, null, globals));
+    map_set(globals, intern("clone"), makeFunction(clone, null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
