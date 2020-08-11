@@ -177,6 +177,10 @@ void println(oop ast);
 
 int getInteger(oop obj)
 {
+    if (!isInteger(obj)) {
+        fprintf(stderr, "\nNon-integer in arithmetic expression\n");
+        exit(1);
+    }
 #if (USE_TAG)
     return (intptr_t)obj >> 1;
 #else
