@@ -272,7 +272,7 @@ oop newBinary(oop proto, oop lhs, oop rhs)
     return obj;
 }
 
-oop newSetMember(oop proto, oop map, oop key, oop value)
+oop newSetMap(oop proto, oop map, oop key, oop value)
 {
     oop obj = newObject(proto);
     map_set(obj, map_symbol, map);
@@ -281,27 +281,9 @@ oop newSetMember(oop proto, oop map, oop key, oop value)
     return obj;
 }
 
-oop newGetMember(oop map, oop key)
-{
-    oop obj = newObject(getMember_proto);
-    map_set(obj, map_symbol, map);
-    map_set(obj, key_symbol, key);
-    return obj;
-}
-
-// Same function as newSetMember, must find a general name and merge
-oop newSetIndex(oop proto, oop map, oop key, oop value)
+oop newGetMap(oop proto, oop map, oop key)
 {
     oop obj = newObject(proto);
-    map_set(obj, map_symbol, map);
-    map_set(obj, key_symbol, key);
-    map_set(obj, value_symbol, value);
-    return obj;
-}
-
-oop newGetIndex(oop map, oop key)
-{
-    oop obj = newObject(getIndex_proto);
     map_set(obj, map_symbol, map);
     map_set(obj, key_symbol, key);
     return obj;
@@ -423,30 +405,30 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
                 | ASSIGNSHRIGHT e:exp                        { $$ = newBinary(assignShright_proto, l, e) }
                 )
         |       l:postfix DOT   i:IDENT        
-                ( ASSIGN        e:exp                        { $$ = newSetMember(setMember_proto, l, i, e) }
-                | ASSIGNADD     e:exp                        { $$ = newSetMember(setMemberAdd_proto, l, i, e) }
-                | ASSIGNSUB     e:exp                        { $$ = newSetMember(setMemberSub_proto, l, i, e) }
-                | ASSIGNMUL     e:exp                        { $$ = newSetMember(setMemberMul_proto, l, i, e) }
-                | ASSIGNDIV     e:exp                        { $$ = newSetMember(setMemberDiv_proto, l, i, e) }
-                | ASSIGNMOD     e:exp                        { $$ = newSetMember(setMemberMod_proto, l, i, e) }
-                | ASSIGNBITOR   e:exp                        { $$ = newSetMember(setMemberBitor_proto, l, i, e) }
-                | ASSIGNBITXOR  e:exp                        { $$ = newSetMember(setMemberBitxor_proto, l, i, e) }
-                | ASSIGNBITAND  e:exp                        { $$ = newSetMember(setMemberBitand_proto, l, i, e) }
-                | ASSIGNSHLEFT  e:exp                        { $$ = newSetMember(setMemberShleft_proto, l, i, e) }
-                | ASSIGNSHRIGHT e:exp                        { $$ = newSetMember(setMemberShright_proto, l, i, e) }
+                ( ASSIGN        e:exp                        { $$ = newSetMap(setMember_proto, l, i, e) }
+                | ASSIGNADD     e:exp                        { $$ = newSetMap(setMemberAdd_proto, l, i, e) }
+                | ASSIGNSUB     e:exp                        { $$ = newSetMap(setMemberSub_proto, l, i, e) }
+                | ASSIGNMUL     e:exp                        { $$ = newSetMap(setMemberMul_proto, l, i, e) }
+                | ASSIGNDIV     e:exp                        { $$ = newSetMap(setMemberDiv_proto, l, i, e) }
+                | ASSIGNMOD     e:exp                        { $$ = newSetMap(setMemberMod_proto, l, i, e) }
+                | ASSIGNBITOR   e:exp                        { $$ = newSetMap(setMemberBitor_proto, l, i, e) }
+                | ASSIGNBITXOR  e:exp                        { $$ = newSetMap(setMemberBitxor_proto, l, i, e) }
+                | ASSIGNBITAND  e:exp                        { $$ = newSetMap(setMemberBitand_proto, l, i, e) }
+                | ASSIGNSHLEFT  e:exp                        { $$ = newSetMap(setMemberShleft_proto, l, i, e) }
+                | ASSIGNSHRIGHT e:exp                        { $$ = newSetMap(setMemberShright_proto, l, i, e) }
                 )
         |       l:postfix LBRAC i:exp   RBRAC  
-                ( ASSIGN        e:exp                        { $$ = newSetIndex(setIndex_proto, l, i, e) }
-                | ASSIGNADD     e:exp                        { $$ = newSetIndex(setIndexAdd_proto, l, i, e) }
-                | ASSIGNSUB     e:exp                        { $$ = newSetIndex(setIndexSub_proto, l, i, e) }
-                | ASSIGNMUL     e:exp                        { $$ = newSetIndex(setIndexMul_proto, l, i, e) }
-                | ASSIGNDIV     e:exp                        { $$ = newSetIndex(setIndexDiv_proto, l, i, e) }
-                | ASSIGNMOD     e:exp                        { $$ = newSetIndex(setIndexMod_proto, l, i, e) }
-                | ASSIGNBITOR   e:exp                        { $$ = newSetIndex(setIndexBitor_proto, l, i, e) }
-                | ASSIGNBITXOR  e:exp                        { $$ = newSetIndex(setIndexBitxor_proto, l, i, e) }
-                | ASSIGNBITAND  e:exp                        { $$ = newSetIndex(setIndexBitand_proto, l, i, e) }
-                | ASSIGNSHLEFT  e:exp                        { $$ = newSetIndex(setIndexShleft_proto, l, i, e) }
-                | ASSIGNSHRIGHT e:exp                        { $$ = newSetIndex(setIndexShright_proto, l, i, e) }
+                ( ASSIGN        e:exp                        { $$ = newSetMap(setIndex_proto, l, i, e) }
+                | ASSIGNADD     e:exp                        { $$ = newSetMap(setIndexAdd_proto, l, i, e) }
+                | ASSIGNSUB     e:exp                        { $$ = newSetMap(setIndexSub_proto, l, i, e) }
+                | ASSIGNMUL     e:exp                        { $$ = newSetMap(setIndexMul_proto, l, i, e) }
+                | ASSIGNDIV     e:exp                        { $$ = newSetMap(setIndexDiv_proto, l, i, e) }
+                | ASSIGNMOD     e:exp                        { $$ = newSetMap(setIndexMod_proto, l, i, e) }
+                | ASSIGNBITOR   e:exp                        { $$ = newSetMap(setIndexBitor_proto, l, i, e) }
+                | ASSIGNBITXOR  e:exp                        { $$ = newSetMap(setIndexBitxor_proto, l, i, e) }
+                | ASSIGNBITAND  e:exp                        { $$ = newSetMap(setIndexBitand_proto, l, i, e) }
+                | ASSIGNSHLEFT  e:exp                        { $$ = newSetMap(setIndexShleft_proto, l, i, e) }
+                | ASSIGNSHRIGHT e:exp                        { $$ = newSetMap(setIndexShright_proto, l, i, e) }
                 )
         |       c:cond                                       { $$ = c }
 
@@ -532,7 +514,7 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, int
                                              | ASSIGNBITAND
                                              | ASSIGNSHLEFT
                                              | ASSIGNSHRIGHT
-                                             )                  { i = newGetMember(i, s) }
+                                             )                  { i = newGetMap(getMember_proto, i, s) }
                     | LBRAC  p:exp   RBRAC  !(ASSIGN 
                                              | ASSIGNADD
                                              | ASSIGNSUB
@@ -544,7 +526,7 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, int
                                              | ASSIGNBITAND
                                              | ASSIGNSHLEFT
                                              | ASSIGNSHRIGHT
-                                             )                  { i = newGetIndex(i, p) }
+                                             )                  { i = newGetMap(getIndex_proto, i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
