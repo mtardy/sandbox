@@ -238,6 +238,7 @@ oop makeMap()
 
 size_t map_size(oop map)
 {
+    assert(is(Map, map));
     return get(map, Map, size);
 }
 
@@ -295,9 +296,8 @@ ssize_t map_search(oop map, oop key)
 
 bool map_hasKey(oop map, oop key)
 {
-    // checks already done by map_search
-    //assert(is(Map, map));
-    //assert(key);
+    assert(is(Map, map));
+    assert(key);
     return map_search(map, key) >= 0;
 }
 
@@ -371,6 +371,43 @@ oop map_del(oop map, oop key)
 oop map_append(oop map, oop value)
 {
     return map_set(map, makeInteger(map_size(map)), value);
+}
+
+bool isHidden(oop obj) {
+    if (!is(Symbol, obj)) {
+        return false;
+    }
+    char *s = get(obj, Symbol, name);
+    size_t l = strlen(s);
+    // maybe 'l > 5' because of ____?
+    if (l > 4 && s[0] == '_' && s[1] == '_' && s[l-2] == '_' && s[l-1] == '_') {
+        return true;
+    }
+    return false;
+}
+
+oop map_keys(oop map)
+{
+    assert(is(Map, map));
+    oop keys = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+        if (!isHidden(get(map, Map, elements)[i].key)) {
+            map_append(keys, get(map, Map, elements)[i].key);
+        }
+    }
+    return keys;
+}
+
+oop map_values(oop map)
+{
+    assert(is(Map, map));
+    oop values = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+        if (!isHidden(get(map, Map, elements)[i].key)) {
+            map_append(values, get(map, Map, elements)[i].value);
+        }
+    }
+    return values;
 }
 
 void map_print(oop map, int ident)
