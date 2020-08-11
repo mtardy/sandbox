@@ -6,13 +6,19 @@
  * run:        echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS()                                                                                                 \
-    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration) _DO(assign)     \
-    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                                   \
-    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                                       \
-    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)                \
-    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                                         \
-    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                                       \
+#define DO_PROTOS()                                                                                     \
+    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(func) _DO(block) _DO(declaration)     \
+    _DO(assign) _DO(assignAdd) _DO(assignSub) _DO(assignMul) _DO(assignDiv) _DO(assignMod)              \
+    _DO(assignBitor) _DO(assignBitxor) _DO(assignBitand) _DO(assignShleft) _DO(assignShright)           \
+    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                       \
+    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                           \
+    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)    \
+    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                             \
+    _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                           \
+    _DO(setMemberAdd) _DO(setMemberSub) _DO(setMemberMul) _DO(setMemberDiv) _DO(setMemberMod)           \
+    _DO(setMemberBitor) _DO(setMemberBitxor) _DO(setMemberBitand) _DO(setMemberShleft) _DO(setMemberShright) \
+    _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                \
+    _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright) \
     _DO(return) _DO(break) _DO(continue)
 
 typedef enum {
@@ -167,14 +173,6 @@ oop newSwitch(oop expression, oop labels, oop statements)
     return obj;
 }
 
-oop newAssign(oop lhs, oop rhs)
-{
-    oop assign = newObject(assign_proto);
-    map_set(assign, lhs_symbol, lhs);
-    map_set(assign, rhs_symbol, rhs);
-    return assign;
-}
-
 // take char *name or oop already interned?
 oop newSymbol(oop name)
 {
@@ -274,10 +272,9 @@ oop newBinary(oop proto, oop lhs, oop rhs)
     return obj;
 }
 
-// factorize a bit or not?
-oop newSetMember(oop map, oop key, oop value)
+oop newSetMember(oop proto, oop map, oop key, oop value)
 {
-    oop obj = newObject(setMember_proto);
+    oop obj = newObject(proto);
     map_set(obj, map_symbol, map);
     map_set(obj, key_symbol, key);
     map_set(obj, value_symbol, value);
@@ -292,9 +289,10 @@ oop newGetMember(oop map, oop key)
     return obj;
 }
 
-oop newSetIndex(oop map, oop key, oop value)
+// Same function as newSetMember, must find a general name and merge
+oop newSetIndex(oop proto, oop map, oop key, oop value)
 {
-    oop obj = newObject(setIndex_proto);
+    oop obj = newObject(proto);
     map_set(obj, map_symbol, map);
     map_set(obj, key_symbol, key);
     map_set(obj, value_symbol, value);
@@ -411,9 +409,45 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   RETURN                                           { $$ = newReturn(null) }
         |   BREAK                                            { $$ = newBreak() }
         |   CONTINUE                                         { $$ = newContinue() }
-        |       l:IDENT                        ASSIGN e:exp  { $$ = newAssign(l, e) }
-        |       l:postfix DOT   i:IDENT        ASSIGN e:exp  { $$ = newSetMember(l, i, e) }
-        |       l:postfix LBRAC i:exp   RBRAC  ASSIGN e:exp  { $$ = newSetIndex(l, i, e) }
+        |       l:IDENT                     
+                ( ASSIGN        e:exp                        { $$ = newBinary(assign_proto, l, e) }
+                | ASSIGNADD     e:exp                        { $$ = newBinary(assignAdd_proto, l, e) }
+                | ASSIGNSUB     e:exp                        { $$ = newBinary(assignSub_proto, l, e) }
+                | ASSIGNMUL     e:exp                        { $$ = newBinary(assignMul_proto, l, e) }
+                | ASSIGNDIV     e:exp                        { $$ = newBinary(assignDiv_proto, l, e) }
+                | ASSIGNMOD     e:exp                        { $$ = newBinary(assignMod_proto, l, e) }
+                | ASSIGNBITOR   e:exp                        { $$ = newBinary(assignBitor_proto , l, e) }
+                | ASSIGNBITXOR  e:exp                        { $$ = newBinary(assignBitxor_proto, l, e) }
+                | ASSIGNBITAND  e:exp                        { $$ = newBinary(assignBitand_proto, l, e) }
+                | ASSIGNSHLEFT  e:exp                        { $$ = newBinary(assignShleft_proto , l, e) }
+                | ASSIGNSHRIGHT e:exp                        { $$ = newBinary(assignShright_proto, l, e) }
+                )
+        |       l:postfix DOT   i:IDENT        
+                ( ASSIGN        e:exp                        { $$ = newSetMember(setMember_proto, l, i, e) }
+                | ASSIGNADD     e:exp                        { $$ = newSetMember(setMemberAdd_proto, l, i, e) }
+                | ASSIGNSUB     e:exp                        { $$ = newSetMember(setMemberSub_proto, l, i, e) }
+                | ASSIGNMUL     e:exp                        { $$ = newSetMember(setMemberMul_proto, l, i, e) }
+                | ASSIGNDIV     e:exp                        { $$ = newSetMember(setMemberDiv_proto, l, i, e) }
+                | ASSIGNMOD     e:exp                        { $$ = newSetMember(setMemberMod_proto, l, i, e) }
+                | ASSIGNBITOR   e:exp                        { $$ = newSetMember(setMemberBitor_proto, l, i, e) }
+                | ASSIGNBITXOR  e:exp                        { $$ = newSetMember(setMemberBitxor_proto, l, i, e) }
+                | ASSIGNBITAND  e:exp                        { $$ = newSetMember(setMemberBitand_proto, l, i, e) }
+                | ASSIGNSHLEFT  e:exp                        { $$ = newSetMember(setMemberShleft_proto, l, i, e) }
+                | ASSIGNSHRIGHT e:exp                        { $$ = newSetMember(setMemberShright_proto, l, i, e) }
+                )
+        |       l:postfix LBRAC i:exp   RBRAC  
+                ( ASSIGN        e:exp                        { $$ = newSetIndex(setIndex_proto, l, i, e) }
+                | ASSIGNADD     e:exp                        { $$ = newSetIndex(setIndexAdd_proto, l, i, e) }
+                | ASSIGNSUB     e:exp                        { $$ = newSetIndex(setIndexSub_proto, l, i, e) }
+                | ASSIGNMUL     e:exp                        { $$ = newSetIndex(setIndexMul_proto, l, i, e) }
+                | ASSIGNDIV     e:exp                        { $$ = newSetIndex(setIndexDiv_proto, l, i, e) }
+                | ASSIGNMOD     e:exp                        { $$ = newSetIndex(setIndexMod_proto, l, i, e) }
+                | ASSIGNBITOR   e:exp                        { $$ = newSetIndex(setIndexBitor_proto, l, i, e) }
+                | ASSIGNBITXOR  e:exp                        { $$ = newSetIndex(setIndexBitxor_proto, l, i, e) }
+                | ASSIGNBITAND  e:exp                        { $$ = newSetIndex(setIndexBitand_proto, l, i, e) }
+                | ASSIGNSHLEFT  e:exp                        { $$ = newSetIndex(setIndexShleft_proto, l, i, e) }
+                | ASSIGNSHRIGHT e:exp                        { $$ = newSetIndex(setIndexShright_proto, l, i, e) }
+                )
         |       c:cond                                       { $$ = c }
 
 block   = LCB  m:makeMap
@@ -487,8 +521,30 @@ prefix  =   PLUS   n:prefix             { $$= n }
         |          n:postfix            { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, intern("this"), i); i = newCall(i, a) }
-                    | DOT    s:IDENT        !ASSIGN             { i = newGetMember(i, s) }
-                    | LBRAC  p:exp   RBRAC  !ASSIGN             { i = newGetIndex(i, p) }
+                    | DOT    s:IDENT        !(ASSIGN 
+                                             | ASSIGNADD
+                                             | ASSIGNSUB
+                                             | ASSIGNMUL
+                                             | ASSIGNDIV
+                                             | ASSIGNMOD
+                                             | ASSIGNBITOR
+                                             | ASSIGNBITXOR
+                                             | ASSIGNBITAND
+                                             | ASSIGNSHLEFT
+                                             | ASSIGNSHRIGHT
+                                             )                  { i = newGetMember(i, s) }
+                    | LBRAC  p:exp   RBRAC  !(ASSIGN 
+                                             | ASSIGNADD
+                                             | ASSIGNSUB
+                                             | ASSIGNMUL
+                                             | ASSIGNDIV
+                                             | ASSIGNMOD
+                                             | ASSIGNBITOR
+                                             | ASSIGNBITXOR
+                                             | ASSIGNBITAND
+                                             | ASSIGNSHLEFT
+                                             | ASSIGNSHRIGHT
+                                             )                  { i = newGetIndex(i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
 
@@ -585,6 +641,16 @@ MULTI   =    '*'        ![=]          -
 DIVIDE  =    '/'        ![/=]         -
 MODULO  =    '%'        ![=]          -
 ASSIGN  =    '='        ![=]          -
+ASSIGNADD =  '+='                     -
+ASSIGNSUB =  '-='                     -
+ASSIGNMUL =  '*='                     -
+ASSIGNDIV =  '/='                     -
+ASSIGNMOD =  '%='                     -
+ASSIGNBITOR ='|='                     -
+ASSIGNBITXOR='^='                     -
+ASSIGNBITAND='&='                     -
+ASSIGNSHLEFT='<<='                    -
+ASSIGNSHRIGHT='>>='                   -
 QUERY   =    '?'                      -
 COLON   =    ':'                      -
 SEMICOLON =  ';'                      -
@@ -970,6 +1036,24 @@ oop eval(oop scope, oop ast)
         oop value = eval(scope, map_get(ast, value_symbol));
         return map_set(map, key, value);
     }
+# define SETMEMBEROP(OPERATION, OPERATOR)                                                                       \
+    case t_setMember##OPERATION: {                                                                              \
+        oop map = eval(scope, map_get(ast, map_symbol));                                                        \
+        oop key = map_get(ast, key_symbol);                                                                     \
+        oop value = eval(scope, map_get(ast, value_symbol));                                                    \
+        return map_set(map, key, makeInteger(getInteger(getVariable(map, key)) OPERATOR getInteger(value)));    \
+    }
+    SETMEMBEROP(Add,     +);
+    SETMEMBEROP(Sub,     -);
+    SETMEMBEROP(Mul,     *);
+    SETMEMBEROP(Div,     /);
+    SETMEMBEROP(Mod,     %);
+    SETMEMBEROP(Bitor,   |);
+    SETMEMBEROP(Bitxor,  ^);
+    SETMEMBEROP(Bitand,  &);
+    SETMEMBEROP(Shleft,  <<);
+    SETMEMBEROP(Shright, >>);
+# undef SETMEMBEROP
     case t_getIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
@@ -981,6 +1065,24 @@ oop eval(oop scope, oop ast)
         oop value = eval(scope, map_get(ast, value_symbol));
         return map_set(map, key, value);
     }
+# define SETINDEXOP(OPERATION, OPERATOR)                                                                      \
+    case t_setIndex##OPERATION: {                                                                             \
+        oop map = eval(scope, map_get(ast, map_symbol));                                                      \
+        oop key = eval(scope, map_get(ast, key_symbol));                                                      \
+        oop value = eval(scope, map_get(ast, value_symbol));                                                  \
+        return map_set(map, key, makeInteger(getInteger(getVariable(map, key)) OPERATOR getInteger(value)));  \
+    }
+    SETINDEXOP(Add,     +);
+    SETINDEXOP(Sub,     -);
+    SETINDEXOP(Mul,     *);
+    SETINDEXOP(Div,     /);
+    SETINDEXOP(Mod,     %);
+    SETINDEXOP(Bitor,   |);
+    SETINDEXOP(Bitxor,  ^);
+    SETINDEXOP(Bitand,  &);
+    SETINDEXOP(Shleft,  <<);
+    SETINDEXOP(Shright, >>);
+# undef SETINDEXOP
     case t_symbol:
     case t_integer:
     case t_string: {
@@ -1000,6 +1102,24 @@ oop eval(oop scope, oop ast)
         if (isFalse(eval(scope, rhs))) return makeInteger(0);
         return makeInteger(1);
     }
+# define ASSIGNOP(OPERATION, OPERATOR)                                                      \
+    case t_assign##OPERATION: {                                                             \
+        oop lhs = map_get(ast, lhs_symbol);                                                 \
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));                                    \
+        oop result = makeInteger(getInteger(eval(scope, lhs)) OPERATOR getInteger(rhs));    \
+        return setVariable(scope, lhs, result);                                             \
+    }
+    ASSIGNOP(Add,     +);
+    ASSIGNOP(Sub,     -);
+    ASSIGNOP(Mul,     *);
+    ASSIGNOP(Div,     /);
+    ASSIGNOP(Mod,     %);
+    ASSIGNOP(Bitor,   |);
+    ASSIGNOP(Bitxor,  ^);
+    ASSIGNOP(Bitand,  &);
+    ASSIGNOP(Shleft,  <<);
+    ASSIGNOP(Shright, >>);
+# undef ASSIGNOP
 # define BINARY(NAME, OPERATOR)                                         \
     case t_##NAME: {                                                    \
         oop lhs = eval(scope, map_get(ast, lhs_symbol));                \
