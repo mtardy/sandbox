@@ -503,32 +503,22 @@ prefix  =   PLUS   n:prefix             { $$= n }
         |          n:postfix            { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { map_set(a, intern("this"), i); i = newCall(i, a) }
-                    | DOT    s:IDENT        !(ASSIGN 
-                                             | ASSIGNADD
-                                             | ASSIGNSUB
-                                             | ASSIGNMUL
-                                             | ASSIGNDIV
-                                             | ASSIGNMOD
-                                             | ASSIGNBITOR
-                                             | ASSIGNBITXOR
-                                             | ASSIGNBITAND
-                                             | ASSIGNSHLEFT
-                                             | ASSIGNSHRIGHT
-                                             )                  { i = newGetMap(getMember_proto, i, s) }
-                    | LBRAC  p:exp   RBRAC  !(ASSIGN 
-                                             | ASSIGNADD
-                                             | ASSIGNSUB
-                                             | ASSIGNMUL
-                                             | ASSIGNDIV
-                                             | ASSIGNMOD
-                                             | ASSIGNBITOR
-                                             | ASSIGNBITXOR
-                                             | ASSIGNBITAND
-                                             | ASSIGNSHLEFT
-                                             | ASSIGNSHRIGHT
-                                             )                  { i = newGetMap(getIndex_proto, i, p) }
+                    | DOT    s:IDENT        !assignOp                  { i = newGetMap(getMember_proto, i, s) }
+                    | LBRAC  p:exp   RBRAC  !assignOp                  { i = newGetMap(getIndex_proto, i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
                     ) *                                         { $$ = i }
+
+assignOp = ASSIGN 
+         | ASSIGNADD
+         | ASSIGNSUB
+         | ASSIGNMUL
+         | ASSIGNDIV
+         | ASSIGNMOD
+         | ASSIGNBITOR
+         | ASSIGNBITXOR
+         | ASSIGNBITAND
+         | ASSIGNSHLEFT
+         | ASSIGNSHRIGHT 
 
 paramList    = LPAREN  m:makeMap
                 ( i:IDENT           { map_append(m, i) }
