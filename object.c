@@ -413,10 +413,14 @@ oop map_values(oop map)
 void map_print(oop map, int ident)
 {
     assert(is(Map, map));
-    if (ident > 1) {
-        printf("\n");
+    if (ident == 0) {
+        printf("{");
+        map_print(map, ident + 1);
+        printf("}");
+        return;
     }
     for (size_t i = 0; i < map_size(map); i++) {
+        printf("\n");
         for (size_t i = 0; i < ident; i++) {
             printf("|");
             printf("   ");
@@ -430,7 +434,8 @@ void map_print(oop map, int ident)
         } else {
             print(rhs);
         }
-        if (i < map_size(map) - 1) printf(",\n");
+        if (i < map_size(map) - 1) printf(",");
+        if (ident == 1 && i == map_size(map) - 1) printf("\n");
     }
     return;
 }
@@ -455,23 +460,7 @@ void print(oop ast)
         printf("Function@%p", get(ast, Function, primitive));
         return;
     case Map:
-        /*
-        printf("{");
-        for (size_t i = 0; i < get(ast, Map, size); i++) {
-            printf(" ");
-            // I could write this instead but I want a special print for my string key name
-            print(get(ast, Map, elements)[i].key);
-            //printf("%s", get(get(ast, Map, elements)[i].key, String, value));
-            printf(": ");
-            print(get(ast, Map, elements)[i].value);
-            if (i < get(ast, Map, size) - 1)    printf(",");
-            else                                printf(" ");
-        }
-        printf("}");
-        */
-        printf("{\n");
-        map_print(ast, 1);
-        printf("\n}");
+        map_print(ast, 0);
         return;
     }
     assert(0);
