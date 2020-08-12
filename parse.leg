@@ -1084,7 +1084,7 @@ oop eval(oop scope, oop ast)
         oop name  = map_get(ast, name_symbol);
         oop param = map_get(ast, param_symbol);
         oop body  = map_get(ast, body_symbol);
-        oop func  = makeFunction(NULL, param, body, scope);
+        oop func  = makeFunction(NULL, get(name, Symbol, name), param, body, scope);
         if (opt_v) {
             printf("funcscope: ");
             println(scope);
@@ -1558,12 +1558,12 @@ int main(int argc, char **argv)
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit")  , makeFunction(prim_exit,   null, null, globals));
-    map_set(globals, intern("keys")  , makeFunction(prim_keys,   null, null, globals));
-    map_set(globals, intern("length"), makeFunction(prim_length, null, null, globals));
-    map_set(globals, intern("print") , makeFunction(prim_print,  null, null, globals));
-    map_set(globals, intern("invoke"), makeFunction(prim_invoke, null, null, globals));
-    map_set(globals, intern("clone") , makeFunction(prim_clone,  null, null, globals));
+    map_set(globals, intern("exit")  , makeFunction(prim_exit,   "exit",   null, null, globals));
+    map_set(globals, intern("keys")  , makeFunction(prim_keys,   "keys",   null, null, globals));
+    map_set(globals, intern("length"), makeFunction(prim_length, "length", null, null, globals));
+    map_set(globals, intern("print") , makeFunction(prim_print,  "print",  null, null, globals));
+    map_set(globals, intern("invoke"), makeFunction(prim_invoke, "invoke", null, null, globals));
+    map_set(globals, intern("clone") , makeFunction(prim_clone,  "clone",  null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
