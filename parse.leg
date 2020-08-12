@@ -6,23 +6,23 @@
  * run:        echo "3+4"  | ./parse
  */
 
-#define DO_PROTOS()                                                                                     \
-    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(invoke) _DO(func) _DO(block) _DO(declaration)     \
-    _DO(assign) _DO(assignAdd) _DO(assignSub) _DO(assignMul) _DO(assignDiv) _DO(assignMod)              \
-    _DO(assignBitor) _DO(assignBitxor) _DO(assignBitand) _DO(assignShleft) _DO(assignShright)           \
-    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                       \
-    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                           \
-    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)    \
-    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                             \
-    _DO(preIncVariable) _DO(preIncMember) _DO(preIncIndex)                         \
-    _DO(postIncVariable) _DO(postIncMember) _DO(postIncIndex)                         \
-    _DO(preDecVariable) _DO(preDecMember) _DO(preDecIndex)                         \
-    _DO(postDecVariable) _DO(postDecMember) _DO(postDecIndex)                         \
-    _DO(getVariable) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                          \
-    _DO(setMemberAdd) _DO(setMemberSub) _DO(setMemberMul) _DO(setMemberDiv) _DO(setMemberMod)           \
-    _DO(setMemberBitor) _DO(setMemberBitxor) _DO(setMemberBitand) _DO(setMemberShleft) _DO(setMemberShright) \
-    _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                \
-    _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright) \
+#define DO_PROTOS()                                                                                             \
+    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(invoke) _DO(func) _DO(block) _DO(declaration) \
+    _DO(assign) _DO(assignAdd) _DO(assignSub) _DO(assignMul) _DO(assignDiv) _DO(assignMod)                      \
+    _DO(assignBitor) _DO(assignBitxor) _DO(assignBitand) _DO(assignShleft) _DO(assignShright)                   \
+    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                               \
+    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                                   \
+    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)            \
+    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                                     \
+    _DO(preIncVariable) _DO(preIncMember) _DO(preIncIndex)                                                      \
+    _DO(postIncVariable) _DO(postIncMember) _DO(postIncIndex)                                                   \
+    _DO(preDecVariable) _DO(preDecMember) _DO(preDecIndex)                                                      \
+    _DO(postDecVariable) _DO(postDecMember) _DO(postDecIndex)                                                   \
+    _DO(getVariable) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                  \
+    _DO(setMemberAdd) _DO(setMemberSub) _DO(setMemberMul) _DO(setMemberDiv) _DO(setMemberMod)                   \
+    _DO(setMemberBitor) _DO(setMemberBitxor) _DO(setMemberBitand) _DO(setMemberShleft) _DO(setMemberShright)    \
+    _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                        \
+    _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright)         \
     _DO(return) _DO(break) _DO(continue)
 
 typedef enum {
@@ -81,7 +81,7 @@ jb_record *jbRecPop() {
 oop globals= 0;
 
 #define DO_SYMBOLS()                                                                                            \
-     DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__)                                                  \
+     DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__) _DO(__arguments__)                               \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
     _DO(update) _DO(this)
@@ -120,9 +120,10 @@ void printObjectName(oop object)
     }
 }
 
-oop newMap()
+oop newMap(oop value)
 {
     oop map = newObject(map_proto);
+    map_set(map, value_symbol, value);
     return map;
 }
 
@@ -393,11 +394,11 @@ oop newCall(oop func, oop args)
     return call;
 }
 
-oop newInvoke(oop func, oop this, oop args)
+oop newInvoke(oop this, oop name, oop args)
 {
     oop obj = newObject(invoke_proto);
-    map_set(obj, func_symbol, func);
     map_set(obj, this_symbol, this);
+    map_set(obj, name_symbol, name);
     map_set(obj, args_symbol, args);
     return obj;
 }
@@ -440,7 +441,7 @@ oop getVariable(oop object, oop key)
 {
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
-        if (object == null) {
+        if (null == object) {
             return null;
         }
     }
@@ -450,14 +451,14 @@ oop getVariable(oop object, oop key)
 // this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
 oop setVariable(oop object, oop key, oop value)
 {
-    while (!map_hasKey(object, key)) {
-        object = map_get(object, __proto___symbol);
-        if (object == null) {
-            fprintf(stderr, "\nUndefined, %s\n", get(key, Symbol, name));
-            exit(1);
+    oop obj= object;
+    while (!map_hasKey(obj, key)) {
+        obj= map_get(obj, __proto___symbol);
+        if (null == object) {
+            return map_set(object, key, value);
         }
     }
-    return map_set(object, key, value);
+    return map_set(obj, key, value);
 }
 
 oop fold(oop ast);
@@ -611,7 +612,7 @@ prefix  =   PLUS       n:prefix           { $$= n }
         |   MINUSMINUS n:prefix           { $$= newPreDecrement(n) }
         |              n:postfix          { $$= n }
 
-postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(s, i, a) }
+postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
                     | DOT    s:IDENT        !assignOp           { i = newGetMap(getMember_proto, i, s) }
                     | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(getIndex_proto, i, p) }
                     | a:argumentList                            { i = newCall(i, a) }
@@ -648,7 +649,7 @@ argumentList = LPAREN  m:makeMap
 value   =   n:NUMBER                { $$ = n }
         |   s:STRING                { $$ = newString(s) }
         |   s:symbol                { $$ = s }
-        |   m:map                   { $$ = m }
+        |   m:map                   { $$ = newMap(m) }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
         |   LPAREN i:exp   RPAREN   { $$ = i }
@@ -662,7 +663,7 @@ symbol  =   HASH    ( i:IDENT                   { $$ = newSymbol(i) }
                     | i:STRING                  { $$ = newSymbol(intern(get(i, String, value))) }
                     )
 
-map     =   LCB   m:newMap
+map     =   LCB   m:makeMap
             (           k:IDENT COLON v:exp     { map_set(m, k, v) }
             (     COMMA k:IDENT COLON v:exp     { map_set(m, k, v) }
             ) *
@@ -670,7 +671,6 @@ map     =   LCB   m:newMap
             RCB                                 { $$ = m }
 
 makeMap=   { $$ = makeMap() }
-newMap =   { $$ = newMap() }
 
 -       =  (blank | comment)*
 
@@ -780,7 +780,6 @@ oop map_zip(oop keys, oop values)
 
 oop clone(oop obj)
 {
-    oop clone;
     switch(getType(obj)) {
         case Undefined:
         case Integer:
@@ -788,21 +787,16 @@ oop clone(oop obj)
         case Symbol:
             return obj;
         case String:
-            fprintf(stderr, "\nTODO: clone strings\n");
-            exit(1);
-        case Map:
-            // please don't mind
-            // COMMENT THE NEXT LINE, FOR TESTING BECAUSE PRIMITIVE FUNCTRION ARE CALLED WITH AN ARRAY OF ARGS
-            // obj = map_get(obj, makeInteger(0));
-            clone = makeMap();
-            // copy the map
-            memcpy(clone, obj, sizeof(struct Map));
-            // allocate memory for elements (capacity)
-            set(clone, Map, elements, memcheck(malloc(sizeof(struct Pair) * get(obj, Map, capacity))));
-            // copy the elements (size)
-            memcpy(get(clone, Map, elements), get(obj, Map, elements), sizeof(struct Pair) * get(obj, Map, size));
-            return clone;
+            return makeString(get(obj, String, value));
+        case Map: {
+            struct Pair *elements= malloc(sizeof(struct Pair) * get(obj, Map, capacity));
+            memcpy(elements, get(obj, Map, elements), sizeof(struct Pair) * get(obj, Map, capacity));
+            oop map= malloc(sizeof(*obj));
+            memcpy(map, obj, sizeof(*obj));
+            set(map, Map, elements, elements);
+            return map;
         }
+    }
     return obj;
 }
 
@@ -879,6 +873,11 @@ oop evalArgs(oop scope, oop args);
 
 oop eval(oop scope, oop ast)
 {
+    if (opt_v) {
+        printf("EVAL: ");
+        println(ast);
+    }
+
     switch(getType(ast)) {
     case Undefined:
     case Integer:
@@ -905,12 +904,10 @@ oop eval(oop scope, oop ast)
         return 0;
     }
     case t_map: {
-        oop map = clone(ast);
-        oop keys = map_keys(map);
-        oop key;
-        for (size_t i = 0; i < map_size(keys); i++) {
-            key = map_get(keys, makeInteger(i));
-            map_set(map, key, eval(scope, map_get(map, key)));
+        oop map= clone(map_get(ast, value_symbol));
+        for (size_t i= 0;  i < map_size(map);  ++i) {
+            struct Pair *pair= &get(map, Map, elements)[i];
+            pair->value= eval(scope, pair->value);
         }
         return map;
     }
@@ -1091,6 +1088,7 @@ oop eval(oop scope, oop ast)
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
             oop localScope = map_zip(param, args);
+            map_set(localScope, __arguments___symbol, args);
             map_set(localScope, __proto___symbol, get(func, Function, parentScope));
             if (opt_v) {
                 printf("parentScope: ");
@@ -1126,50 +1124,51 @@ oop eval(oop scope, oop ast)
     case t_invoke: {
         // this is what differs from t_call
         oop this = eval(scope, map_get(ast, this_symbol));
-        oop func = getVariable(this, map_get(ast, func_symbol));
+        oop func = getVariable(this, map_get(ast, name_symbol));
         if (!is(Function, func)) {
-            printf("cannot call ");
+            printf("cannot invoke ");
             println(func);
             exit(1);
         }
 
         oop args = evalArgs(scope, map_get(ast, args_symbol));
-        if (get(func, Function, primitive) == NULL) {
-            oop param = get(func, Function, param);
-            oop localScope = map_zip(param, args);
-            // and set this in the local scope
-            map_set(localScope, this_symbol, this);
-            map_set(localScope, __proto___symbol, get(func, Function, parentScope));
-            if (opt_v) {
-                printf("parentScope: ");
-                println(get(func, Function, parentScope));
-                printf("localScope: ");
-                println(localScope);
-            }
-
-            jbRecPush();
-            int jbt = sigsetjmp(jbs->jb, 0);
-            switch (jbt) {
-                case j_return: {
-                    oop result = jbs->result;
-                    jbRecPop();
-                    return result;
-                }
-                case j_break: {
-                    fprintf(stderr, "\nbreak outside of a loop\n");
-                    exit(1);
-                }
-                case j_continue: {
-                    fprintf(stderr, "\ncontinue outside of a loop\n");
-                    exit(1);
-                }
-            }
-
-            oop result = eval(localScope, get(func, Function, body));
-            jbRecPop();
-            return result;
+        if (NULL != get(func, Function, primitive)) {
+            return get(func, Function, primitive)(args);
         }
-        return get(func, Function, primitive)(args);
+        oop param = get(func, Function, param);
+        oop localScope = map_zip(param, args);
+        // and set this in the local scope
+        map_set(localScope, this_symbol, this);
+        map_set(localScope, __arguments___symbol, args);
+        map_set(localScope, __proto___symbol, get(func, Function, parentScope));
+        if (opt_v) {
+            printf("parentScope: ");
+            println(get(func, Function, parentScope));
+            printf("localScope: ");
+            println(localScope);
+        }
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                return result;
+            }
+            case j_break: {
+                fprintf(stderr, "\nbreak outside of a loop\n");
+                exit(1);
+            }
+            case j_continue: {
+                fprintf(stderr, "\ncontinue outside of a loop\n");
+                exit(1);
+            }
+        }
+
+        oop result = eval(localScope, get(func, Function, body));
+        jbRecPop();
+        return result;
     }
 
     case t_return: {
@@ -1204,7 +1203,7 @@ oop eval(oop scope, oop ast)
     case t_getMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
-        return map_get(map, key);
+        return getVariable(map, key);
     }
     case t_setMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
@@ -1431,13 +1430,59 @@ oop prim_exit(oop params)
     exit(status);
 }
 
+oop prim_invoke(oop params)
+{
+    oop scope= globals;  if (map_hasIntegerKey(params, 0)) scope= get(params, Map, elements)[0].value;
+    oop this= null;      if (map_hasIntegerKey(params, 1)) this=  get(params, Map, elements)[1].value;
+    oop func= null;      if (map_hasIntegerKey(params, 2)) func=  get(params, Map, elements)[2].value;
+    oop args= null;      if (map_hasIntegerKey(params, 3)) args=  get(params, Map, elements)[3].value;
+    if (!is(Function, func)) {
+        printf("cannot invoke ");
+        println(func);
+        exit(1);
+    }
+    if (NULL != get(func, Function, primitive)) {
+        return get(func, Function, primitive)(args);
+    }
+    oop param = get(func, Function, param);
+    oop localScope = map_zip(param, args);
+    map_set(localScope, this_symbol, this);
+    map_set(localScope, __arguments___symbol, args);
+    map_set(localScope, __proto___symbol, get(func, Function, parentScope));
+    jbRecPush();
+    int jbt = sigsetjmp(jbs->jb, 0);
+    switch (jbt) {
+        case j_return: {
+            oop result = jbs->result;
+            jbRecPop();
+            return result;
+        }
+        case j_break: {
+            fprintf(stderr, "\nbreak outside of a loop\n");
+            exit(1);
+        }
+        case j_continue: {
+            fprintf(stderr, "\ncontinue outside of a loop\n");
+            exit(1);
+        }
+    }
+    oop result= eval(localScope, get(func, Function, body));
+    jbRecPop();
+    return result;
+}
+
+oop prim_clone(oop params)
+{
+    if (map_hasIntegerKey(params, 0)) return clone(get(params, Map, elements)[0].value);
+    return null;
+}
+
 oop prim_print(oop params)
 {
     assert(is(Map, params));
     for (int i= 0;  map_hasIntegerKey(params, i);  ++i) {
         print(get(params, Map, elements)[i].value);
     }
-    printf("\n");
     return params;
 }
 
@@ -1470,9 +1515,10 @@ int main(int argc, char **argv)
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit") , makeFunction(prim_exit,  null, null, globals));
-    map_set(globals, intern("print"), makeFunction(prim_print, null, null, globals));
-    map_set(globals, intern("clone"), makeFunction(clone, null, null, globals));
+    map_set(globals, intern("exit") ,  makeFunction(prim_exit,   null, null, globals));
+    map_set(globals, intern("print"),  makeFunction(prim_print,  null, null, globals));
+    map_set(globals, intern("invoke"), makeFunction(prim_invoke, null, null, globals));
+    map_set(globals, intern("clone"),  makeFunction(prim_clone,  null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
