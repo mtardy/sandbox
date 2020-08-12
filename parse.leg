@@ -23,7 +23,8 @@
     _DO(setMemberBitor) _DO(setMemberBitxor) _DO(setMemberBitand) _DO(setMemberShleft) _DO(setMemberShright)    \
     _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                        \
     _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright)         \
-    _DO(return) _DO(break) _DO(continue)
+    _DO(return) _DO(break) _DO(continue)                                                                        \
+    _DO(literal)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -429,6 +430,13 @@ oop newContinue(void)
     return obj;
 }
 
+oop newLiteral(oop exp)
+{
+    oop obj = newObject(literal_proto);
+    map_set(obj, value_symbol, exp);
+    return obj;
+}
+
 // this always creates the key in "object"
 oop newVariable(oop object, oop key, oop value)
 {
@@ -472,6 +480,8 @@ void error(char *text)
     fprintf(stderr, "\nSyntax error near: %s\n", text);
     exit(1);
 }
+
+oop eval(oop scope, oop ast);
 
 %}
 
@@ -653,6 +663,8 @@ value   =   n:NUMBER                { $$ = n }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
         |   LPAREN i:exp   RPAREN   { $$ = i }
+        |   BACKTICK e:exp          { $$ = newLiteral(e) }
+        |   AT e:exp                { $$ = eval(globals, e) }
 
 STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE      { $$ = makeString(unescape(yytext)) }
         |   DQUOTE < (!DQUOTE char)* > DQUOTE      { $$ = makeString(unescape(yytext)) }
@@ -743,6 +755,8 @@ COLON   =    ':'                      -
 SEMICOLON =  ';'                      -
 COMMA   =    ','                      -
 DOT     =    '.'                      -
+BACKTICK=    '`'                      -
+AT      =    '@'                      -
 LCB     =    '{'                      -
 RCB     =    '}'                      -
 LBRAC   =    '['                      -
@@ -910,6 +924,10 @@ oop eval(oop scope, oop ast)
             pair->value= eval(scope, pair->value);
         }
         return map;
+    }
+    case t_literal: {
+        oop obj = map_get(ast, value_symbol);
+        return obj;
     }
     case t_declaration: {
         oop lhs = map_get(ast, lhs_symbol);
