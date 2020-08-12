@@ -674,7 +674,7 @@ makeMap=   { $$ = makeMap() }
 
 -       =  (blank | comment)*
 
-blank   =  [ \t\n\r]
+blank   =  space | eol
 space   =  [ \t]
 eol     =  "\n""\r"* | "\r""\n"*
 
