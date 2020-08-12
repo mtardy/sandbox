@@ -3,3 +3,30 @@
 		return
 		break in switch, loops
 		continue in loops
+
+getFunction(Object.print)
+{
+  __proto__ : { __name__ : Function },
+  body:       anAst,
+  parameters: aMap,
+  scope:      aMap,
+}
+
+makeFunction({
+  __proto__ : { __name__ : Function },
+  body:       anAst,
+  parameters: aMap,
+  scope:      aMap,
+})
+
+
+var num = `4;             // THESE ARE THE
+var ast = `(3+@num);      // IMPORTANT 2 LINES
+
+println(3 + @ast);   // -> 10
+println(3 + (3+4));  // -> 10
+
+syntax for () {
+    if      (__arguments__[1] == #in) { }
+    else if (__arguments__[1] == #on) { }
+}

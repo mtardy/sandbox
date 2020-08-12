@@ -11,7 +11,7 @@ Object.new = fun () {
     var obj= { __proto__ : this };
     var init= this.init;
     print("INIT is ", init);
-    init && invoke(null, obj, init, __arguments__);
+    init && invoke(obj, init, __arguments__);
     obj;
 };
 
@@ -26,4 +26,39 @@ Point.init = fun (x, y) {
     this.y = y;
 }
 
-print("Point.new(3, 4) is ", Point.new(3, 4));
+var p = Point.new(3, 4);
+
+print("Point.new(3, 4) is ", p);
+
+
+
+Object.clone = fun () { clone(this) }
+
+var q = p.clone();
+
+print("clone is ", q);
+
+Object.println = fun () { this.print();  print('\n');  this; }
+
+Object.print = fun () {
+    var proto= this.__proto__;
+    if (!proto) print(this);
+    else {
+        var name= proto.__name__;
+        if (!name) print(this);
+	else {
+            print(name, "{");
+	    var keys= keys(this);
+	    for (var i= 0;  i < length(keys);  ++i) {
+	        var key= keys[i];
+	        var val= this[key];
+		if (i) print(", ");
+		print(" ", key, ": ", val);
+	    }
+            print(" }");
+        }
+    }
+    this;
+}
+
+p.println()

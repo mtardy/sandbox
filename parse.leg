@@ -1318,12 +1318,15 @@ oop eval(oop scope, oop ast)
     BINARY(div,       / );
     BINARY(mod,       % );
 # undef BINARY
+    case t_not: {
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return makeInteger(isFalse(rhs));
+    }
 # define UNARY(NAME, OPERATOR)                              \
     case t_##NAME: {                                        \
         oop rhs = eval(scope, map_get(ast, rhs_symbol));    \
         return makeInteger(OPERATOR getInteger(rhs));       \
     }
-    UNARY(not, !);
     UNARY(neg, -);
     UNARY(com, ~);
 # undef UNARY
@@ -1424,18 +1427,40 @@ oop prim_exit(oop params)
 {
     int status= 0;
     if (map_hasIntegerKey(params, 0)) {
-    oop arg= get(params, Map, elements)[0].value;
-    if (isInteger(arg)) status= getInteger(arg);
+	oop arg= get(params, Map, elements)[0].value;
+	if (isInteger(arg)) status= getInteger(arg);
     }
     exit(status);
 }
 
+oop prim_keys(oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+	oop arg= get(params, Map, elements)[0].value;
+	if (is(Map, arg)) return map_keys(arg);
+    }
+    return null;
+}
+
+oop prim_length(oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+        oop arg= get(params, Map, elements)[0].value;
+        switch (getType(arg)) {
+            case String: return makeInteger(strlen(get(arg, String, value)));
+            case Symbol: return makeInteger(strlen(get(arg, Symbol, name)));
+            case Map:    return makeInteger(map_size(arg));
+            default:     break;
+        }
+    }
+    return null;
+}
+
 oop prim_invoke(oop params)
 {
-    oop scope= globals;  if (map_hasIntegerKey(params, 0)) scope= get(params, Map, elements)[0].value;
-    oop this= null;      if (map_hasIntegerKey(params, 1)) this=  get(params, Map, elements)[1].value;
-    oop func= null;      if (map_hasIntegerKey(params, 2)) func=  get(params, Map, elements)[2].value;
-    oop args= null;      if (map_hasIntegerKey(params, 3)) args=  get(params, Map, elements)[3].value;
+    oop this= null;      if (map_hasIntegerKey(params, 0)) this=  get(params, Map, elements)[0].value;
+    oop func= null;      if (map_hasIntegerKey(params, 1)) func=  get(params, Map, elements)[1].value;
+    oop args= null;      if (map_hasIntegerKey(params, 2)) args=  get(params, Map, elements)[2].value;
     if (!is(Function, func)) {
         printf("cannot invoke ");
         println(func);
@@ -1515,10 +1540,12 @@ int main(int argc, char **argv)
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit") ,  makeFunction(prim_exit,   null, null, globals));
-    map_set(globals, intern("print"),  makeFunction(prim_print,  null, null, globals));
+    map_set(globals, intern("exit")  , makeFunction(prim_exit,   null, null, globals));
+    map_set(globals, intern("keys")  , makeFunction(prim_keys,   null, null, globals));
+    map_set(globals, intern("length"), makeFunction(prim_length, null, null, globals));
+    map_set(globals, intern("print") , makeFunction(prim_print,  null, null, globals));
     map_set(globals, intern("invoke"), makeFunction(prim_invoke, null, null, globals));
-    map_set(globals, intern("clone"),  makeFunction(prim_clone,  null, null, globals));
+    map_set(globals, intern("clone") , makeFunction(prim_clone,  null, null, globals));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
