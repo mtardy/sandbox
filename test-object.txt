@@ -1,0 +1,29 @@
+var Object = { __name__: #"Object" };
+
+print("Object is ", Object);
+
+var Point = { __name__: #"Point", __proto__ : Object };
+
+print("Point is ", Point);
+
+Object.new = fun () {
+    print("ARGS are ", __arguments__);
+    var obj= { __proto__ : this };
+    var init= this.init;
+    print("INIT is ", init);
+    init && invoke(null, obj, init, __arguments__);
+    obj;
+};
+
+print("Object.new is ", Object.new);
+
+print("Point.new is ", Point.new);
+
+print("Object.new() is ", Object.new());
+
+Point.init = fun (x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+print("Point.new(3, 4) is ", Point.new(3, 4));
