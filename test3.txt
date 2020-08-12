@@ -1,8 +1,12 @@
-fun f(n) {
-    if (n < 2) {
-        return 1
-    } else {
-        return 1 + f(n-1) + f(n-2)
-    }
-}
-f(27)
+var o = {}
+o.a = 12
+o.b = "salut"
+var c = clone(o, "12");
+
+c.a = 24
+c.b = "au revoir"
+c.chips = "on va manger, des chips!!!"
+
+
+o
+c
