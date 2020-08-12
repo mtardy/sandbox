@@ -374,14 +374,11 @@ oop map_append(oop map, oop value)
 }
 
 bool isHidden(oop obj) {
-    if (!is(Symbol, obj)) {
-        return false;
-    }
-    char *s = get(obj, Symbol, name);
-    size_t l = strlen(s);
-    // maybe 'l > 5' because of ____?
-    if (l > 4 && s[0] == '_' && s[1] == '_' && s[l-2] == '_' && s[l-1] == '_') {
-        return true;
+    if (is(Symbol, obj)) {
+	char *s = get(obj, Symbol, name);
+	size_t l = strlen(s);
+	// maybe 'l > 5' because of ____?
+	return (l > 4 && s[0] == '_' && s[1] == '_' && s[l-2] == '_' && s[l-1] == '_');
     }
     return false;
 }
@@ -394,6 +391,16 @@ oop map_keys(oop map)
         if (!isHidden(get(map, Map, elements)[i].key)) {
             map_append(keys, get(map, Map, elements)[i].key);
         }
+    }
+    return keys;
+}
+
+oop map_allKeys(oop map)
+{
+    assert(is(Map, map));
+    oop keys = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+	map_append(keys, get(map, Map, elements)[i].key);
     }
     return keys;
 }
@@ -451,7 +458,7 @@ void print(oop ast)
         printf("%i", getInteger(ast));
         return;
     case String:
-        printf("'%s'", get(ast, String, value));
+        printf("%s", get(ast, String, value));
         return;
     case Symbol:
         printf("%s", get(ast, Symbol, name));
