@@ -24,7 +24,7 @@
     _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                        \
     _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright)         \
     _DO(return) _DO(break) _DO(continue)                                                                        \
-    _DO(literal)
+    _DO(quasiquote) _DO(unquote)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -85,7 +85,7 @@ oop globals= 0;
      DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__) _DO(__arguments__)                               \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
-    _DO(update) _DO(this)
+    _DO(update) _DO(this) _DO(fixed)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -96,6 +96,16 @@ DO_PROTOS()
 #undef _DO
 
 int opt_v = 0;
+
+int isFalse(oop obj)
+{
+    return obj == null || (isInteger(obj) && (0 == getInteger(obj)));
+}
+
+int isTrue(oop obj)
+{
+    return !isFalse(obj);
+}
 
 oop newObject(oop proto)
 {
@@ -119,6 +129,38 @@ void printObjectName(oop object)
     } else {
         fprintf(stderr, "\nThis map has no name\n");
     }
+}
+
+// this always creates the key in "object"
+oop newVariable(oop object, oop key, oop value)
+{
+    map_set(object, key, value);
+    return value;
+}
+
+// this looks in object and everything in the __proto__ chain until it finds the key
+oop getVariable(oop object, oop key)
+{
+    while (!map_hasKey(object, key)) {
+        object = map_get(object, __proto___symbol);
+        if (null == object) {
+            return null;
+        }
+    }
+    return map_get(object, key);
+}
+
+// this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
+oop setVariable(oop object, oop key, oop value)
+{
+    oop obj= object;
+    while (!map_hasKey(obj, key)) {
+        obj= map_get(obj, __proto___symbol);
+        if (null == object) {
+            return map_set(object, key, value);
+        }
+    }
+    return map_set(obj, key, value);
 }
 
 oop newMap(oop value)
@@ -378,17 +420,27 @@ oop newGetVariable(oop name)
     return id;
 }
 
-oop newFunc(oop name, oop param, oop body)
+oop newFunc(oop name, oop param, oop body, oop fixed)
 {
     oop func = newObject(func_proto);
     map_set(func, name_symbol,  name);
     map_set(func, param_symbol, param);
     map_set(func, body_symbol,  body);
+    map_set(func, fixed_symbol, fixed);
     return func;
 }
 
+oop apply(oop func, oop args);
+
 oop newCall(oop func, oop args)
 {
+    if (map_get(func, __proto___symbol) == getVariable_proto) {
+        oop key = map_get(func, key_symbol);
+        oop val = getVariable(globals, key);
+        if (is(Function, val) && isTrue(get(val, Function, fixed))) {
+            return apply(val, args);
+        }
+    }
     oop call = newObject(call_proto);
     map_set(call, func_symbol, func);
     map_set(call, args_symbol, args);
@@ -430,45 +482,6 @@ oop newContinue(void)
     return obj;
 }
 
-oop newLiteral(oop exp)
-{
-    oop obj = newObject(literal_proto);
-    map_set(obj, value_symbol, exp);
-    return obj;
-}
-
-// this always creates the key in "object"
-oop newVariable(oop object, oop key, oop value)
-{
-    map_set(object, key, value);
-    return value;
-}
-
-// this looks in object and everything in the __proto__ chain until it finds the key
-oop getVariable(oop object, oop key)
-{
-    while (!map_hasKey(object, key)) {
-        object = map_get(object, __proto___symbol);
-        if (null == object) {
-            return null;
-        }
-    }
-    return map_get(object, key);
-}
-
-// this follows the __proto__ chain until it finds the key, if it fails it behaves like newMember
-oop setVariable(oop object, oop key, oop value)
-{
-    oop obj= object;
-    while (!map_hasKey(obj, key)) {
-        obj= map_get(obj, __proto___symbol);
-        if (null == object) {
-            return map_set(object, key, value);
-        }
-    }
-    return map_set(obj, key, value);
-}
-
 oop fold(oop ast);
 
 #define YYSTYPE oop
@@ -497,8 +510,10 @@ stmt    =   e:exp SEMICOLON*                                 { $$ = e }
 
 exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
-        |   FUN l:IDENT                   p:paramList e:stmt { $$ = newFunc(l, p, e) }
-        |   FUN                           p:paramList e:stmt { $$ = newFunc(null, p, e) }
+        |   FUN l:IDENT                   p:paramList e:stmt { $$ = newFunc(l, p, e, null) }
+        |   FUN                           p:paramList e:stmt { $$ = newFunc(null, p, e, null) }
+        |   SYNTAX l:IDENT                p:paramList e:stmt { $$ = newFunc(l, p, e, makeInteger(1)) }
+        |   SYNTAX                        p:paramList e:stmt { $$ = newFunc(null, p, e, makeInteger(1)) }
         |   IF        LPAREN c:exp RPAREN t:stmt ELSE f:stmt { $$ = newIf(c, t, f   ) }
         |   IF        LPAREN c:exp RPAREN t:stmt             { $$ = newIf(c, t, null) }
         |   WHILE LPAREN c:exp RPAREN s:stmt                 { $$ = newWhile(c, s) }
@@ -509,7 +524,7 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   RETURN                                           { $$ = newReturn(null) }
         |   BREAK                                            { $$ = newBreak() }
         |   CONTINUE                                         { $$ = newContinue() }
-        |       l:IDENT                     
+        |       l:IDENT
                 ( ASSIGN        e:exp                        { $$ = newBinary(assign_proto, l, e) }
                 | ASSIGNADD     e:exp                        { $$ = newBinary(assignAdd_proto, l, e) }
                 | ASSIGNSUB     e:exp                        { $$ = newBinary(assignSub_proto, l, e) }
@@ -522,7 +537,7 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
                 | ASSIGNSHLEFT  e:exp                        { $$ = newBinary(assignShleft_proto , l, e) }
                 | ASSIGNSHRIGHT e:exp                        { $$ = newBinary(assignShright_proto, l, e) }
                 )
-        |       l:postfix DOT   i:IDENT        
+        |       l:postfix DOT   i:IDENT
                 ( ASSIGN        e:exp                        { $$ = newSetMap(setMember_proto, l, i, e) }
                 | ASSIGNADD     e:exp                        { $$ = newSetMap(setMemberAdd_proto, l, i, e) }
                 | ASSIGNSUB     e:exp                        { $$ = newSetMap(setMemberSub_proto, l, i, e) }
@@ -535,7 +550,7 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
                 | ASSIGNSHLEFT  e:exp                        { $$ = newSetMap(setMemberShleft_proto, l, i, e) }
                 | ASSIGNSHRIGHT e:exp                        { $$ = newSetMap(setMemberShright_proto, l, i, e) }
                 )
-        |       l:postfix LBRAC i:exp   RBRAC  
+        |       l:postfix LBRAC i:exp   RBRAC
                 ( ASSIGN        e:exp                        { $$ = newSetMap(setIndex_proto, l, i, e) }
                 | ASSIGNADD     e:exp                        { $$ = newSetMap(setIndexAdd_proto, l, i, e) }
                 | ASSIGNSUB     e:exp                        { $$ = newSetMap(setIndexSub_proto, l, i, e) }
@@ -620,6 +635,8 @@ prefix  =   PLUS       n:prefix           { $$= n }
         |   PLING      n:prefix           { $$= newUnary(not_proto, n) }
         |   PLUSPLUS   n:prefix           { $$= newPreIncrement(n) }
         |   MINUSMINUS n:prefix           { $$= newPreDecrement(n) }
+        |   BACKTICK   n:prefix           { $$ = newUnary(quasiquote_proto, n) }
+        |   AT         n:prefix           { $$ = newUnary(unquote_proto, n) }
         |              n:postfix          { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
@@ -630,7 +647,7 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(
                     | MINUSMINUS                                { i = newPostDecrement(i) }
                     ) *                                         { $$ = i }
 
-assignOp = ASSIGN 
+assignOp = ASSIGN
          | ASSIGNADD
          | ASSIGNSUB
          | ASSIGNMUL
@@ -640,7 +657,7 @@ assignOp = ASSIGN
          | ASSIGNBITXOR
          | ASSIGNBITAND
          | ASSIGNSHLEFT
-         | ASSIGNSHRIGHT 
+         | ASSIGNSHRIGHT
 
 paramList    = LPAREN  m:makeMap
                 ( i:IDENT           { map_append(m, i) }
@@ -663,8 +680,6 @@ value   =   n:NUMBER                { $$ = n }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
         |   LPAREN i:exp   RPAREN   { $$ = i }
-        |   BACKTICK e:exp          { $$ = newLiteral(e) }
-        |   AT e:exp                { $$ = eval(globals, e) }
 
 STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE      { $$ = makeString(unescape(yytext)) }
         |   DQUOTE < (!DQUOTE char)* > DQUOTE      { $$ = makeString(unescape(yytext)) }
@@ -693,7 +708,7 @@ eol     =  "\n""\r"* | "\r""\n"*
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
 
-keyword = FUN | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL | RETURN | BREAK | CONTINUE
+keyword = FUN | SYNTAX | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL | RETURN | BREAK | CONTINUE
 
 IDENT   =    !keyword < [a-zA-Z_][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 
@@ -703,6 +718,7 @@ NUMBER  =    '0b' < [01]+        >                 -   { $$ = newInteger(strtol(
         |         < [0-9]+       >                 -   { $$ = newInteger(strtol(yytext, 0, 10)) }
 
 FUN     =    'fun'      ![a-zA-Z0-9_] -
+SYNTAX  =    'syntax'   ![a-zA-Z0-9_] -
 VAR     =    'var'      ![a-zA-Z0-9_] -
 SWITCH  =    'switch'   ![a-zA-Z0-9_] -
 CASE    =    'case'     ![a-zA-Z0-9_] -
@@ -769,16 +785,6 @@ SQUOTE  =    "'"                      -
 %%
 ;
 
-int isFalse(oop obj)
-{
-    return obj == null || (isInteger(obj) && (0 == getInteger(obj)));
-}
-
-int isTrue(oop obj)
-{
-    return !isFalse(obj);
-}
-
 oop map_zip(oop keys, oop values)
 {
     assert(is(Map, keys));
@@ -810,6 +816,22 @@ oop clone(oop obj)
             set(map, Map, elements, elements);
             return map;
         }
+    }
+    return obj;
+}
+
+oop expandUnquotes(oop scope, oop obj)
+{
+    obj = clone(obj);
+    if (!is(Map, obj)) {
+        return obj;
+    }
+    if (map_get(obj, __proto___symbol) == unquote_proto) {
+        return eval(scope, map_get(obj, rhs_symbol));
+    }
+    for (size_t i= 0;  i < map_size(obj);  ++i) {
+        struct Pair *pair= &get(obj, Map, elements)[i];
+        pair->value= expandUnquotes(scope, pair->value);
     }
     return obj;
 }
@@ -925,9 +947,13 @@ oop eval(oop scope, oop ast)
         }
         return map;
     }
-    case t_literal: {
-        oop obj = map_get(ast, value_symbol);
-        return obj;
+    case t_quasiquote: {
+        oop obj = map_get(ast, rhs_symbol);
+        return expandUnquotes(scope, obj);
+    }
+    case t_unquote: {
+        fprintf(stderr, "\n@ outside of `\n");
+        exit(1);
     }
     case t_declaration: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -1078,13 +1104,18 @@ oop eval(oop scope, oop ast)
     case t_assign: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        return setVariable(scope, lhs, rhs);
+        setVariable(scope, lhs, rhs);
+        if (is(Function, rhs) && null == get(rhs, Function, name)) {
+            set(rhs, Function, name, lhs);
+        }
+        return rhs;
     }
     case t_func: {
         oop name  = map_get(ast, name_symbol);
         oop param = map_get(ast, param_symbol);
         oop body  = map_get(ast, body_symbol);
-        oop func  = makeFunction(NULL, get(name, Symbol, name), param, body, scope);
+        oop fixed = map_get(ast, fixed_symbol);
+        oop func  = makeFunction(NULL, name, param, body, scope, fixed);
         if (opt_v) {
             printf("funcscope: ");
             println(scope);
@@ -1102,7 +1133,10 @@ oop eval(oop scope, oop ast)
             exit(1);
         }
 
-        oop args = evalArgs(scope, map_get(ast, args_symbol));
+        oop args = map_get(ast, args_symbol);
+        if (isFalse(get(func, Function, fixed))) {
+            args = evalArgs(scope, args);
+        }
         if (get(func, Function, primitive) == NULL) {
             oop param = get(func, Function, param);
             oop localScope = map_zip(param, args);
@@ -1227,6 +1261,9 @@ oop eval(oop scope, oop ast)
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
+        if (is(Function, value) && null == get(value, Function, name)) {
+            set(value, Function, name, key);
+        }
         return map_set(map, key, value);
     }
 # define SETMEMBEROP(OPERATION, OPERATOR)                                                                       \
@@ -1514,6 +1551,48 @@ oop prim_invoke(oop params)
     return result;
 }
 
+oop apply(oop func, oop args)
+{
+    if (!is(Function, func)) {
+        printf("cannot apply ");
+        println(func);
+        exit(1);
+    }
+    if (NULL != get(func, Function, primitive)) {
+        return get(func, Function, primitive)(args);
+    }
+    oop param = get(func, Function, param);
+    oop localScope = map_zip(param, args);
+    map_set(localScope, __arguments___symbol, args);
+    map_set(localScope, __proto___symbol, get(func, Function, parentScope));
+    jbRecPush();
+    int jbt = sigsetjmp(jbs->jb, 0);
+    switch (jbt) {
+        case j_return: {
+            oop result = jbs->result;
+            jbRecPop();
+            return result;
+        }
+        case j_break: {
+            fprintf(stderr, "\nbreak outside of a loop\n");
+            exit(1);
+        }
+        case j_continue: {
+            fprintf(stderr, "\ncontinue outside of a loop\n");
+            exit(1);
+        }
+    }
+    oop result= eval(localScope, get(func, Function, body));
+    jbRecPop();
+    return result;
+}
+
+oop prim_apply(oop params) {
+    oop func= null;      if (map_hasIntegerKey(params, 0)) func=  get(params, Map, elements)[0].value;
+    oop args= null;      if (map_hasIntegerKey(params, 1)) args=  get(params, Map, elements)[1].value;
+    return apply(func, args);
+}
+
 oop prim_clone(oop params)
 {
     if (map_hasIntegerKey(params, 0)) return clone(get(params, Map, elements)[0].value);
@@ -1558,12 +1637,14 @@ int main(int argc, char **argv)
     symbol_table = makeMap();
     globals = makeMap();
 
-    map_set(globals, intern("exit")  , makeFunction(prim_exit,   "exit",   null, null, globals));
-    map_set(globals, intern("keys")  , makeFunction(prim_keys,   "keys",   null, null, globals));
-    map_set(globals, intern("length"), makeFunction(prim_length, "length", null, null, globals));
-    map_set(globals, intern("print") , makeFunction(prim_print,  "print",  null, null, globals));
-    map_set(globals, intern("invoke"), makeFunction(prim_invoke, "invoke", null, null, globals));
-    map_set(globals, intern("clone") , makeFunction(prim_clone,  "clone",  null, null, globals));
+    map_set(globals, intern("exit")  , makeFunction(prim_exit,   intern("exit"),   null, null, globals, null));
+    map_set(globals, intern("keys")  , makeFunction(prim_keys,   intern("keys"),   null, null, globals, null));
+    map_set(globals, intern("length"), makeFunction(prim_length, intern("length"), null, null, globals, null));
+    map_set(globals, intern("print") , makeFunction(prim_print,  intern("print"),  null, null, globals, null));
+    map_set(globals, intern("invoke"), makeFunction(prim_invoke, intern("invoke"), null, null, globals, null));
+    map_set(globals, intern("apply"),  makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
+    map_set(globals, intern("clone") , makeFunction(prim_clone,  intern("clone"),  null, null, globals, null));
+
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()

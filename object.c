@@ -91,10 +91,11 @@ typedef oop (*primitive_t)(oop params);
 struct Function {
     type_t type;
     primitive_t primitive;
-    char *name;
+    oop name;
     oop body;
     oop param;
     oop parentScope;
+    oop fixed;
 };
 
 // usefull for map's elements
@@ -159,7 +160,7 @@ oop _checkType(oop ptr, type_t type, char *file, int line)
     return ptr;
 }
 
-// added parens around e/makexpansion to protect assignment
+// added parens around expansion to protect assignment
 #define get(PTR, TYPE, FIELD)           (_checkType(PTR, TYPE, __FILE__, __LINE__)->TYPE.FIELD)
 #define set(PTR, TYPE, FIELD, VALUE)    (_checkType(PTR, TYPE, __FILE__, __LINE__)->TYPE.FIELD = VALUE)
 
@@ -219,15 +220,16 @@ oop makeSymbol(char *name)
     return newSymb;
 }
 
-oop makeFunction(primitive_t primitive, char * name, oop param, oop body, oop parentScope)
+oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
 {
     oop newFunc = memcheck(malloc(sizeof(union object)));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
-    newFunc->Function.name = memcheck(strdup(name));
+    newFunc->Function.name = name;
     newFunc->Function.param = param;
     newFunc->Function.body = body;
     newFunc->Function.parentScope = parentScope;
+    newFunc->Function.fixed = fixed;
     return newFunc;
 }
 
@@ -467,10 +469,11 @@ void print(oop ast)
         return;
     case Function:
         if (get(ast, Function, primitive) == NULL) {
-            printf("Function:%s", get(ast, Function, name));
+            printf("Function:");
         } else {
-            printf("Primitive:%s@%p", get(ast, Function, name), get(ast, Function, primitive));
+            printf("Primitive:");
         }
+        print(get(ast, Function, name));
         return;
     case Map:
         map_print(ast, 0);
