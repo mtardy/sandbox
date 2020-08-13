@@ -1,12 +1,9 @@
-var o = {}
-o.a = 12
-o.b = "salut"
-var c = clone(o, "12");
+var num = `4;             // THESE ARE THE
+var ast = `(3+@num);      // IMPORTANT 2 LINES
 
-c.a = 24
-c.b = "au revoir"
-c.chips = "on va manger, des chips!!!"
+fun f() {
+    var c = `4+3
+    return 5 + @c
+}
 
-
-o
-c
+f()

@@ -62,3 +62,35 @@ Object.print = fun () {
 }
 
 p.println()
+
+fun println() {
+    apply(print, __arguments__)
+    print("\n")
+}
+
+fun makeAst() {
+    print("Making an AST!")
+    return t
+}
+
+var t = `(3+4)
+println(t)
+
+var a = 333
+syntax double(a) {
+    return `(@a+@a)
+}
+
+double(21)
+
+syntax until(c, b) {
+    return `(while (!@c) @b)
+}
+
+var x = 0
+/*
+until(x==10) {
+    println(x++)
+}
+*/
+(`x).println()
