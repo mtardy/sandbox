@@ -1,0 +1,82 @@
+fun println() { apply(print, __arguments__); print("\n"); }
+
+var Object = { __name__: #"Object" };
+
+Object.println = fun () { this.print();  print('\n');  this; }
+
+Object.print = fun () {
+    var proto= this.__proto__;
+    if (!proto) print(this);
+    else {
+        var name= proto.__name__;
+        if (!name) print(this);
+	else {
+            print(name, "{");
+	    var keys= keys(this);
+	    for (var i= 0;  i < length(keys);  ++i) {
+	        var key= keys[i];
+	        var val= this[key];
+		if (i) print(", ");
+		print(" ", key, ": ", val);
+	    }
+            print(" }");
+        }
+    }
+    this;
+}
+
+Object.init = fun () { this; }
+
+Object.new = fun () {
+    //print("ARGS are ", __arguments__);
+    var obj= { __proto__ : this };
+    var init= this.init;
+    //print("INIT is ", init);
+    init && invoke(obj, init, __arguments__);
+    obj;
+};
+
+var Point = { __name__: #"Point", __proto__ : Object };
+
+Point.init = fun (x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+var p = Point.new(3, 4);
+
+Point.new(3, 4).println();
+
+
+//(`x).__proto__.__proto__ = Object;
+
+//(`x).println();
+
+syntax until (c) b { `(while (!@c) @b) }
+
+x = 0;
+
+until (10 == x) {
+    print(x++, "\n")
+}
+
+syntax foreach (variable, map) block {
+    `({
+        var __map= values(@map);
+        var __len= length(__map);
+        for (var __idx= 0;  __idx < __len;  ++__idx) {
+	    var @(variable.key) = __map[__idx];
+	    @block;
+	}
+    });
+}
+
+m = { zero: 0, one: 1, eight: "viii" };
+
+foreach ( val, m ) { print("VALUE ", val, "\n"); }
+
+Point.foreach = fun (f) { f(this.x); f(this.y); }
+
+p.foreach(fun (x) { println(x); })
+
+// p.foreach (x) { println(x); }

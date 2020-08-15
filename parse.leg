@@ -169,10 +169,10 @@ oop setVariable(oop object, oop key, oop value)
 oop getMember(oop object, oop key)
 {
     if (!map_hasKey(object, key)) {
-    printf("\nUndefined: .");
-    println(key);
-    exit(1);
-    return null;
+	printf("\nUndefined: .");
+	println(key);
+	exit(1);
+	return null;
     }
     return map_get(object, key);
 }
@@ -456,15 +456,25 @@ oop newFunc(oop name, oop param, oop body, oop fixed)
 
 oop apply(oop func, oop args);
 
+oop getSyntaxId(int n, oop key)
+{
+    oop val = map_get(globals, key);
+    if (!is(Function, val)) return null;
+    oop fix = get(val, Function, fixed);
+    if (!isInteger(fix)) return null;
+    if (n != getInteger(fix)) return null;
+    return val;
+}
+
+oop getSyntax(int n, oop func)
+{
+    if (map_get(func, __proto___symbol) != getVariable_proto) return null;
+    oop key = map_get(func, key_symbol);
+    return getSyntaxId(n, key);
+}
+
 oop newCall(oop func, oop args)
 {
-    if (map_get(func, __proto___symbol) == getVariable_proto) {
-        oop key = map_get(func, key_symbol);
-        oop val = getVariable(globals, key);
-        if (is(Function, val) && isTrue(get(val, Function, fixed))) {
-            return apply(val, args);
-        }
-    }
     oop call = newObject(call_proto);
     map_set(call, func_symbol, func);
     map_set(call, args_symbol, args);
@@ -508,12 +518,6 @@ oop newContinue(void)
 
 oop fold(oop ast);
 
-int isSyntax(char *s)
-{
-    printf("IS SYNTAX %s\n", s);
-    return 0;
-}
-
 #define YYSTYPE oop
 
 YYSTYPE yylval;
@@ -540,19 +544,21 @@ start   = - ( e:stmt                                         { yylval = e }
 error   =   eol* < (!eol .)* eol* (!eol .)* >                { error(yytext) }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
-        |   s:block                                          { $$ = newBlock(s) }
+        |   s:block                                          { $$ = s }
 
 block   = LCB  m:makeMap
               ( s:stmt                                       { map_append(m, s) }
               ) *
-          RCB                                                { $$ = m }
+          RCB                                                { $$ = newBlock(m) }
 
-exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
+exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclaration(l, e) }
         |   VAR l:IDENT                                      { $$ = newDeclaration(l, null) }
-        |   FUN l:IDENT    p:paramList e:stmt                { $$ = newFunc(l, p, e, null) }
-        |   FUN            p:paramList e:stmt                { $$ = newFunc(null, p, e, null) }
-        |   SYNTAX l:IDENT p:paramList e:stmt                { $$ = newFunc(l, p, e, makeInteger(1)) }
-        |   SYNTAX         p:paramList e:stmt                { $$ = newFunc(null, p, e, makeInteger(1)) }
+        |   FUN l:IDENT    p:paramList         e:block       { $$ = newFunc(l, p, e, null) }
+        |   FUN            p:paramList         e:block       { $$ = newFunc(null, p, e, null) }
+        |   SYNTAX l:IDENT p:paramList q:IDENT e:block       { $$ = (map_append(p, q), newFunc(l,    p, e, makeInteger(2))) }
+        |   SYNTAX         p:paramList q:IDENT e:block       { $$ = (map_append(p, q), newFunc(null, p, e, makeInteger(2))) }
+        |   SYNTAX l:IDENT p:paramList         e:block       { $$ =                    newFunc(l,    p, e, makeInteger(1))  }
+        |   SYNTAX         p:paramList         e:block       { $$ =                    newFunc(null, p, e, makeInteger(1))  }
         |   IF        LPAREN c:exp RPAREN t:stmt ELSE f:stmt { $$ = newIf(c, t, f   ) }
         |   IF        LPAREN c:exp RPAREN t:stmt             { $$ = newIf(c, t, null) }
         |   WHILE LPAREN c:exp RPAREN s:stmt                 { $$ = newWhile(c, s) }
@@ -566,7 +572,14 @@ exp     =   VAR l:IDENT                        ASSIGN e:exp  { $$ = newDeclarati
         |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(assign_proto,    l,    o, e) }
         |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(setMember_proto, l, i, o, e) }
         |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(setIndex_proto,  l, i, o, e) }
+	|   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
         |   c:cond                                           { $$ = c }
+
+ident   =   l:IDENT                                          { $$ = l }
+        |   AT         n:prefix                              { $$ = newUnary(unquote_proto, n) }
+
+syntax2  = < [a-zA-Z_][a-zA-Z0-9_]* >
+           &{ null != getSyntaxId(2, intern(yytext)) }   -   { $$ = getSyntaxId(2, intern(yytext)) }
 
 assignOp = ASSIGN                 { $$= null }
          | ASSIGNADD              { $$= add_symbol }
@@ -652,7 +665,7 @@ prefix  =   PLUS       n:prefix         { $$= n }
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
                     | DOT    s:IDENT        !assignOp           { i = newGetMap(getMember_proto, i, s) }
                     | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(getIndex_proto, i, p) }
-                    | a:argumentList                            { i = newCall(i, a) }
+                    | a:argumentList                            { i = (null != getSyntax(1, i)) ? apply(getSyntax(1, i), a) : newCall(i, a) }
                     | PLUSPLUS                                  { i = newPostIncrement(i) }
                     | MINUSMINUS                                { i = newPostDecrement(i) }
                     ) *                                         { $$ = i }
@@ -677,7 +690,7 @@ value   =   n:NUMBER                { $$ = newInteger(n) }
         |   m:map                   { $$ = newMap(m) }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
-        |   LPAREN i:exp   RPAREN   { $$ = i }
+        |   LPAREN i:stmt  RPAREN   { $$ = i }
 
 STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE      { $$ = makeString(unescape(yytext)) }
         |   DQUOTE < (!DQUOTE char)* > DQUOTE      { $$ = makeString(unescape(yytext)) }
@@ -837,7 +850,9 @@ oop expandUnquotes(oop scope, oop obj)
     }
     for (size_t i= 0;  i < map_size(obj);  ++i) {
         struct Pair *pair= &get(obj, Map, elements)[i];
-        pair->value= expandUnquotes(scope, pair->value);
+	if (__proto___symbol != pair->key) {
+	    pair->value= expandUnquotes(scope, pair->value);
+	}
     }
     return obj;
 }
@@ -1532,6 +1547,15 @@ oop prim_keys(oop params)
     return null;
 }
 
+oop prim_values(oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+    oop arg= get(params, Map, elements)[0].value;
+    if (is(Map, arg)) return map_values(arg);
+    }
+    return null;
+}
+
 oop prim_length(oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
@@ -1674,10 +1698,11 @@ int main(int argc, char **argv)
 
     map_set(globals, intern("exit")  , makeFunction(prim_exit,   intern("exit"),   null, null, globals, null));
     map_set(globals, intern("keys")  , makeFunction(prim_keys,   intern("keys"),   null, null, globals, null));
+    map_set(globals, intern("values"), makeFunction(prim_values, intern("values"), null, null, globals, null));
     map_set(globals, intern("length"), makeFunction(prim_length, intern("length"), null, null, globals, null));
     map_set(globals, intern("print") , makeFunction(prim_print,  intern("print"),  null, null, globals, null));
     map_set(globals, intern("invoke"), makeFunction(prim_invoke, intern("invoke"), null, null, globals, null));
-    map_set(globals, intern("apply"),  makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
+    map_set(globals, intern("apply") , makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
     map_set(globals, intern("clone") , makeFunction(prim_clone,  intern("clone"),  null, null, globals, null));
 
 
