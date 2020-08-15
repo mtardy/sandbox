@@ -474,6 +474,9 @@ void print(oop ast)
             printf("Primitive:");
         }
         print(get(ast, Function, name));
+	printf("(");
+        print(get(ast, Function, param));
+	printf(")");
         return;
     case Map:
         map_print(ast, 0);
