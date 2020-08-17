@@ -518,13 +518,25 @@ oop newContinue(void)
 
 oop fold(oop ast);
 
+FILE *input= 0;
+char *fileName= 0;
+
+#define YY_INPUT(buf, result, max_size)        \
+{                                              \
+int yyc= getc(input);                          \
+result= (EOF == yyc) ? 0 : (*(buf)= yyc, 1);   \
+}
+
 #define YYSTYPE oop
 
 YYSTYPE yylval;
 
+int lineNumber= 1;
+int errorLine= 1;
+
 void error(char *text)
 {
-    fprintf(stderr, "\nSyntax error near: %s\n", text);
+    fprintf(stderr, "\nSyntax error in %s near line %i:\n%s\n", fileName, errorLine, text);
     exit(1);
 }
 
@@ -534,6 +546,7 @@ struct _yycontext;
 
 int yyparsefrom(int (*yystart)(struct _yycontext *yy));
 
+
 %}
 
 start   = - ( e:stmt                                         { yylval = e }
@@ -541,7 +554,8 @@ start   = - ( e:stmt                                         { yylval = e }
             | error
             )
 
-error   =   eol* < (!eol .)* eol* (!eol .)* >                { error(yytext) }
+error   =                                                    { errorLine= lineNumber }
+            eol* < (!eol .)* eol* (!eol .)* >                { error(yytext) }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
         |   s:block                                          { $$ = s }
@@ -722,7 +736,9 @@ key     = IDENT | NUMBER
 
 blank   =  space | eol
 space   =  [ \t]
-eol     =  "\n""\r"* | "\r""\n"*
+eol     =  ( "\n""\r"*
+           | "\r""\n"*
+           )                      { lineNumber++ }
 
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
@@ -1681,19 +1697,20 @@ oop evalArgs(oop scope, oop args)
 
 oop AST= NULL;
 
+void readEvalPrint(void) {
+    lineNumber = 1;
+    while (yyparse()) {
+        if (!yylval) break;             // EOF
+        if (opt_v) println(yylval);
+        println(eval(globals, yylval));
+    }
+}
+
 int main(int argc, char **argv)
 {
 # if (USE_GC)
     GC_INIT();
 # endif
-
-    while (argc-- > 1) {
-        ++argv;
-        if (!strcmp(*argv, "-v"))  ++opt_v;
-        else {
-            fprintf(stderr, "unknown option: %s\n", *argv);
-        }
-    }
 
     symbol_table = makeMap();
     globals = makeMap();
@@ -1726,12 +1743,28 @@ int main(int argc, char **argv)
     DO_PROTOS()
     #undef _DO
 
-    println(AST);
-
-    while (yyparse()) {
-        if (!yylval) break;             // EOF
-        if (opt_v) println(yylval);
-        println(eval(globals, yylval));
+    while (argc-- > 1) {
+        ++argv;
+        if (!strcmp(*argv, "-v"))  ++opt_v;
+        if (!strcmp(*argv, "-")) {
+            input= stdin;
+            fileName= "<stdin>";
+            readEvalPrint();
+        }
+        else {
+            input = fopen(*argv, "rb");
+            if (NULL == input) {
+                perror(*argv);
+                exit(1);
+            }
+            fileName= *argv;
+            readEvalPrint();
+        }
+    }
+    if (0 == input) {
+        input= stdin;
+        fileName= "<stdin>";
+        readEvalPrint();
     }
 
     return 0;
