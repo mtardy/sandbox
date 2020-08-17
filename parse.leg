@@ -7,24 +7,24 @@
  */
 
 #define DO_PROTOS()                                                                                             \
-    _DO(if) _DO(while) _DO(do) _DO(for) _DO(switch) _DO(call) _DO(invoke) _DO(func) _DO(block) _DO(declaration) \
-    _DO(assign) _DO(assignAdd) _DO(assignSub) _DO(assignMul) _DO(assignDiv) _DO(assignMod)                      \
-    _DO(assignBitor) _DO(assignBitxor) _DO(assignBitand) _DO(assignShleft) _DO(assignShright)                   \
-    _DO(map) _DO(symbol) _DO(integer) _DO(string)                                                               \
-    _DO(logor) _DO(logand) _DO(bitor) _DO(bitxor) _DO(bitand)                                                   \
-    _DO(equal) _DO(noteq) _DO(less) _DO(lesseq) _DO(greater) _DO(greatereq) _DO(shleft) _DO(shright)            \
-    _DO(add) _DO(sub) _DO(mul) _DO(div) _DO(mod) _DO(not) _DO(neg) _DO(com)                                     \
-    _DO(preIncVariable) _DO(preIncMember) _DO(preIncIndex)                                                      \
-    _DO(postIncVariable) _DO(postIncMember) _DO(postIncIndex)                                                   \
-    _DO(preDecVariable) _DO(preDecMember) _DO(preDecIndex)                                                      \
-    _DO(postDecVariable) _DO(postDecMember) _DO(postDecIndex)                                                   \
-    _DO(getVariable) _DO(getMember) _DO(setMember) _DO(getIndex) _DO(setIndex)                                  \
-    _DO(setMemberAdd) _DO(setMemberSub) _DO(setMemberMul) _DO(setMemberDiv) _DO(setMemberMod)                   \
-    _DO(setMemberBitor) _DO(setMemberBitxor) _DO(setMemberBitand) _DO(setMemberShleft) _DO(setMemberShright)    \
-    _DO(setIndexAdd) _DO(setIndexSub) _DO(setIndexMul) _DO(setIndexDiv) _DO(setIndexMod)                        \
-    _DO(setIndexBitor) _DO(setIndexBitxor) _DO(setIndexBitand) _DO(setIndexShleft) _DO(setIndexShright)         \
-    _DO(return) _DO(break) _DO(continue)                                                                        \
-    _DO(quasiquote) _DO(unquote)
+    _DO(If) _DO(While) _DO(Do) _DO(For) _DO(Switch) _DO(Call) _DO(Invoke) _DO(Func) _DO(Block) _DO(Declaration) \
+    _DO(Assign) _DO(AssignAdd) _DO(AssignSub) _DO(AssignMul) _DO(AssignDiv) _DO(AssignMod)                      \
+    _DO(AssignBitor) _DO(AssignBitxor) _DO(AssignBitand) _DO(AssignShleft) _DO(AssignShright)                   \
+    _DO(Map) _DO(Symbol) _DO(Integer) _DO(String)                                                               \
+    _DO(Logor) _DO(Logand) _DO(Bitor) _DO(Bitxor) _DO(Bitand)                                                   \
+    _DO(Equal) _DO(Noteq) _DO(Less) _DO(Lesseq) _DO(Greater) _DO(Greatereq) _DO(Shleft) _DO(Shright)            \
+    _DO(Add) _DO(Sub) _DO(Mul) _DO(Div) _DO(Mod) _DO(Not) _DO(Neg) _DO(Com)                                     \
+    _DO(PreIncVariable) _DO(PreIncMember) _DO(PreIncIndex)                                                      \
+    _DO(PostIncVariable) _DO(PostIncMember) _DO(PostIncIndex)                                                   \
+    _DO(PreDecVariable) _DO(PreDecMember) _DO(PreDecIndex)                                                      \
+    _DO(PostDecVariable) _DO(PostDecMember) _DO(PostDecIndex)                                                   \
+    _DO(GetVariable) _DO(GetMember) _DO(SetMember) _DO(GetIndex) _DO(SetIndex)                                  \
+    _DO(SetMemberAdd) _DO(SetMemberSub) _DO(SetMemberMul) _DO(SetMemberDiv) _DO(SetMemberMod)                   \
+    _DO(SetMemberBitor) _DO(SetMemberBitxor) _DO(SetMemberBitand) _DO(SetMemberShleft) _DO(SetMemberShright)    \
+    _DO(SetIndexAdd) _DO(SetIndexSub) _DO(SetIndexMul) _DO(SetIndexDiv) _DO(SetIndexMod)                        \
+    _DO(SetIndexBitor) _DO(SetIndexBitxor) _DO(SetIndexBitand) _DO(SetIndexShleft) _DO(SetIndexShright)         \
+    _DO(Return) _DO(Break) _DO(Continue)                                                                        \
+    _DO(Quasiquote) _DO(Unquote)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -85,7 +85,7 @@ oop globals= 0;
      DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__) _DO(__arguments__)                               \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
-    _DO(update) _DO(this) _DO(fixed) _DO(operator)
+    _DO(update) _DO(this) _DO(fixed) _DO(operator) _DO(map) _DO(func)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -179,14 +179,14 @@ oop getMember(oop object, oop key)
 
 oop newMap(oop value)
 {
-    oop map = newObject(map_proto);
+    oop map = newObject(Map_proto);
     map_set(map, value_symbol, value);
     return map;
 }
 
 oop newDeclaration(oop name, oop exp)
 {
-    oop declaration = newObject(declaration_proto);
+    oop declaration = newObject(Declaration_proto);
     map_set(declaration, lhs_symbol, name);
     map_set(declaration, rhs_symbol, exp);
     return declaration;
@@ -194,7 +194,7 @@ oop newDeclaration(oop name, oop exp)
 
 oop newIf(oop cond, oop cons, oop alt)
 {
-    oop obj = newObject(if_proto);
+    oop obj = newObject(If_proto);
     map_set(obj, condition_symbol,  cond);
     map_set(obj, consequent_symbol, cons);
     map_set(obj, alternate_symbol,  alt);
@@ -203,7 +203,7 @@ oop newIf(oop cond, oop cons, oop alt)
 
 oop newWhile(oop cond, oop body)
 {
-    oop obj = newObject(while_proto);
+    oop obj = newObject(While_proto);
     map_set(obj, condition_symbol, cond);
     map_set(obj, body_symbol,      body);
     return obj;
@@ -211,7 +211,7 @@ oop newWhile(oop cond, oop body)
 
 oop newDo(oop body, oop cond)
 {
-    oop obj= newObject(do_proto);
+    oop obj= newObject(Do_proto);
     map_set(obj, body_symbol,      body);
     map_set(obj, condition_symbol, cond);
     return obj;
@@ -219,7 +219,7 @@ oop newDo(oop body, oop cond)
 
 oop newFor(oop init, oop cond, oop step, oop body)
 {
-    oop obj= newObject(for_proto);
+    oop obj= newObject(For_proto);
     map_set(obj, initialise_symbol, init);
     map_set(obj, condition_symbol,  cond);
     map_set(obj, update_symbol,     step);
@@ -229,7 +229,7 @@ oop newFor(oop init, oop cond, oop step, oop body)
 
 oop newSwitch(oop expression, oop labels, oop statements)
 {
-    oop obj= newObject(switch_proto);
+    oop obj= newObject(Switch_proto);
     map_set(obj, expression_symbol, expression);
     map_set(obj, labels_symbol,     labels);
     map_set(obj, statements_symbol, statements);
@@ -239,7 +239,7 @@ oop newSwitch(oop expression, oop labels, oop statements)
 // take char *name or oop already interned?
 oop newSymbol(oop name)
 {
-    oop symbol = newObject(symbol_proto);
+    oop symbol = newObject(Symbol_proto);
     // what is the less confusing, name or value? maybe another word like identifier?
     map_set(symbol, value_symbol, name);
     return symbol;
@@ -247,7 +247,7 @@ oop newSymbol(oop name)
 
 oop newInteger(oop value)
 {
-    oop integer = newObject(integer_proto);
+    oop integer = newObject(Integer_proto);
     map_set(integer, value_symbol, value);
     return integer;
 }
@@ -314,7 +314,7 @@ char *unescape(char *s)
 
 oop newString(oop str)
 {                                                       assert(is(String, str));
-    oop string = newObject(string_proto);
+    oop string = newObject(String_proto);
     map_set(string, value_symbol, str);
     return string;
 }
@@ -325,9 +325,9 @@ oop newPreIncrement(oop rhs)
     oop name=  map_get(proto, __name___symbol);         assert(null != name);
     proto_t type= get(name, Symbol, prototype);
     switch (type) {
-        case t_getVariable:     proto= preIncVariable_proto;    break;
-        case t_getMember:       proto= preIncMember_proto;      break;
-        case t_getIndex:        proto= preIncIndex_proto;       break;
+        case t_GetVariable:     proto= PreIncVariable_proto;    break;
+        case t_GetMember:       proto= PreIncMember_proto;      break;
+        case t_GetIndex:        proto= PreIncIndex_proto;       break;
         default: {
             printf("\nNon-lvalue after ++: ");
             println(rhs);
@@ -344,9 +344,9 @@ oop newPostIncrement(oop rhs)
     oop name=  map_get(proto, __name___symbol);         assert(null != name);
     proto_t type= get(name, Symbol, prototype);
     switch (type) {
-        case t_getVariable:     proto= postIncVariable_proto;   break;
-        case t_getMember:       proto= postIncMember_proto;     break;
-        case t_getIndex:        proto= postIncIndex_proto;      break;
+        case t_GetVariable:     proto= PostIncVariable_proto;   break;
+        case t_GetMember:       proto= PostIncMember_proto;     break;
+        case t_GetIndex:        proto= PostIncIndex_proto;      break;
         default: {
             printf("\nNon-lvalue before ++: ");
             println(rhs);
@@ -363,9 +363,9 @@ oop newPreDecrement(oop rhs)
     oop name=  map_get(proto, __name___symbol);         assert(null != name);
     proto_t type= get(name, Symbol, prototype);
     switch (type) {
-        case t_getVariable:     proto= preDecVariable_proto;    break;
-        case t_getMember:       proto= preDecMember_proto;      break;
-        case t_getIndex:        proto= preDecIndex_proto;       break;
+        case t_GetVariable:     proto= PreDecVariable_proto;    break;
+        case t_GetMember:       proto= PreDecMember_proto;      break;
+        case t_GetIndex:        proto= PreDecIndex_proto;       break;
         default: {
             printf("\nNon-lvalue after ++: ");
             println(rhs);
@@ -382,9 +382,9 @@ oop newPostDecrement(oop rhs)
     oop name=  map_get(proto, __name___symbol);         assert(null != name);
     proto_t type= get(name, Symbol, prototype);
     switch (type) {
-        case t_getVariable:     proto= postDecVariable_proto;   break;
-        case t_getMember:       proto= postDecMember_proto;     break;
-        case t_getIndex:        proto= postDecIndex_proto;      break;
+        case t_GetVariable:     proto= PostDecVariable_proto;   break;
+        case t_GetMember:       proto= PostDecMember_proto;     break;
+        case t_GetIndex:        proto= PostDecIndex_proto;      break;
         default: {
             printf("\nNon-lvalue before ++: ");
             println(rhs);
@@ -439,14 +439,14 @@ oop newGetMap(oop proto, oop map, oop key)
 
 oop newGetVariable(oop name)
 {
-    oop id= newObject(getVariable_proto);
+    oop id= newObject(GetVariable_proto);
     map_set(id, key_symbol, name);
     return id;
 }
 
 oop newFunc(oop name, oop param, oop body, oop fixed)
 {
-    oop func = newObject(func_proto);
+    oop func = newObject(Func_proto);
     map_set(func, name_symbol,  name);
     map_set(func, param_symbol, param);
     map_set(func, body_symbol,  body);
@@ -468,14 +468,14 @@ oop getSyntaxId(int n, oop key)
 
 oop getSyntax(int n, oop func)
 {
-    if (map_get(func, __proto___symbol) != getVariable_proto) return null;
+    if (map_get(func, __proto___symbol) != GetVariable_proto) return null;
     oop key = map_get(func, key_symbol);
     return getSyntaxId(n, key);
 }
 
 oop newCall(oop func, oop args)
 {
-    oop call = newObject(call_proto);
+    oop call = newObject(Call_proto);
     map_set(call, func_symbol, func);
     map_set(call, args_symbol, args);
     return call;
@@ -483,7 +483,7 @@ oop newCall(oop func, oop args)
 
 oop newInvoke(oop this, oop name, oop args)
 {
-    oop obj = newObject(invoke_proto);
+    oop obj = newObject(Invoke_proto);
     map_set(obj, this_symbol, this);
     map_set(obj, name_symbol, name);
     map_set(obj, args_symbol, args);
@@ -492,27 +492,27 @@ oop newInvoke(oop this, oop name, oop args)
 
 oop newBlock(oop statements)
 {
-    oop obj = newObject(block_proto);
+    oop obj = newObject(Block_proto);
     map_set(obj, statements_symbol, statements);
     return obj;
 }
 
 oop newReturn(oop exp)
 {
-    oop obj = newObject(return_proto);
+    oop obj = newObject(Return_proto);
     map_set(obj, value_symbol, exp);
     return obj;
 }
 
 oop newBreak(void)
 {
-    oop obj = newObject(break_proto);
+    oop obj = newObject(Break_proto);
     return obj;
 }
 
 oop newContinue(void)
 {
-    oop obj = newObject(continue_proto);
+    oop obj = newObject(Continue_proto);
     return obj;
 }
 
@@ -569,29 +569,29 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   RETURN                                           { $$ = newReturn(null) }
         |   BREAK                                            { $$ = newBreak() }
         |   CONTINUE                                         { $$ = newContinue() }
-        |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(assign_proto,    l,    o, e) }
-        |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(setMember_proto, l, i, o, e) }
-        |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(setIndex_proto,  l, i, o, e) }
+        |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(Assign_proto,    l,    o, e) }
+        |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(SetMember_proto, l, i, o, e) }
+        |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(SetIndex_proto,  l, i, o, e) }
 	|   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
         |   c:cond                                           { $$ = c }
 
 ident   =   l:IDENT                                          { $$ = l }
-        |   AT         n:prefix                              { $$ = newUnary(unquote_proto, n) }
+        |   AT         n:prefix                              { $$ = newUnary(Unquote_proto, n) }
 
 syntax2  = < [a-zA-Z_][a-zA-Z0-9_]* >
            &{ null != getSyntaxId(2, intern(yytext)) }   -   { $$ = getSyntaxId(2, intern(yytext)) }
 
 assignOp = ASSIGN                 { $$= null }
-         | ASSIGNADD              { $$= add_symbol }
-         | ASSIGNSUB              { $$= sub_symbol }
-         | ASSIGNMUL              { $$= mul_symbol }
-         | ASSIGNDIV              { $$= div_symbol }
-         | ASSIGNMOD              { $$= mod_symbol }
-         | ASSIGNBITOR            { $$= bitor_symbol }
-         | ASSIGNBITXOR           { $$= bitxor_symbol }
-         | ASSIGNBITAND           { $$= bitand_symbol }
-         | ASSIGNSHLEFT           { $$= shleft_symbol }
-         | ASSIGNSHRIGHT          { $$= shright_symbol }
+         | ASSIGNADD              { $$= Add_symbol }
+         | ASSIGNSUB              { $$= Sub_symbol }
+         | ASSIGNMUL              { $$= Mul_symbol }
+         | ASSIGNDIV              { $$= Div_symbol }
+         | ASSIGNMOD              { $$= Mod_symbol }
+         | ASSIGNBITOR            { $$= Bitor_symbol }
+         | ASSIGNBITXOR           { $$= Bitxor_symbol }
+         | ASSIGNBITAND           { $$= Bitand_symbol }
+         | ASSIGNSHLEFT           { $$= Shleft_symbol }
+         | ASSIGNSHRIGHT          { $$= Shright_symbol }
 
 switch  = SWITCH LPAREN e:exp RPAREN
           LCB statements:makeMap labels:makeMap
@@ -605,66 +605,66 @@ cond    =   c:logor QUERY t:exp COLON f:cond                 { $$ = newIf(c, t, 
         |   logor
 
 logor   =   l:logand
-        ( LOGOR r:logand        { l = newBinary(logor_proto,        l, r) }
+        ( LOGOR r:logand        { l = newBinary(Logor_proto,        l, r) }
         )*                { $$ = l }
 
 logand  =   l:bitor
-        ( LOGAND r:bitor        { l = newBinary(logand_proto,       l, r) }
+        ( LOGAND r:bitor        { l = newBinary(Logand_proto,       l, r) }
         )*                { $$ = l }
 
 bitor   =   l:bitxor
-        ( BITOR r:bitxor        { l = newBinary(bitor_proto,       l, r) }
+        ( BITOR r:bitxor        { l = newBinary(Bitor_proto,       l, r) }
         )*                { $$ = l }
 
 bitxor  =   l:bitand
-        ( BITXOR r:bitand        { l = newBinary(bitxor_proto,       l, r) }
+        ( BITXOR r:bitand        { l = newBinary(Bitxor_proto,       l, r) }
         )*                { $$ = l }
 
 bitand  =   l:eq
-        ( BITAND r:eq            { l = newBinary(bitand_proto,       l, r) }
+        ( BITAND r:eq            { l = newBinary(Bitand_proto,       l, r) }
         )*                { $$ = l }
 
 eq      =   l:ineq
-            ( EQUAL r:ineq              { l = newBinary(equal_proto,      l, r) }
-            | NOTEQ r:ineq              { l = newBinary(noteq_proto,      l, r) }
+            ( EQUAL r:ineq              { l = newBinary(Equal_proto,      l, r) }
+            | NOTEQ r:ineq              { l = newBinary(Noteq_proto,      l, r) }
             )*                          { $$ = l }
 
 ineq    =   l:shift
-            ( LESS      r:shift         { l = newBinary(less_proto,      l, r) }
-            | LESSEQ    r:shift         { l = newBinary(lesseq_proto,    l, r) }
-            | GREATEREQ r:shift         { l = newBinary(greatereq_proto, l, r) }
-            | GREATER   r:shift         { l = newBinary(greater_proto,   l, r) }
+            ( LESS      r:shift         { l = newBinary(Less_proto,      l, r) }
+            | LESSEQ    r:shift         { l = newBinary(Lesseq_proto,    l, r) }
+            | GREATEREQ r:shift         { l = newBinary(Greatereq_proto, l, r) }
+            | GREATER   r:shift         { l = newBinary(Greater_proto,   l, r) }
             )*                          { $$ = l }
 
 shift   =   l:sum
-            ( SHLEFT  r:sum             { l = newBinary(shleft_proto,  l, r) }
-            | SHRIGHT r:sum             { l = newBinary(shright_proto, l, r) }
+            ( SHLEFT  r:sum             { l = newBinary(Shleft_proto,  l, r) }
+            | SHRIGHT r:sum             { l = newBinary(Shright_proto, l, r) }
             )*                          { $$ = l }
 
 sum     =   l:prod
-            ( PLUS  r:prod              { l = newBinary(add_proto, l, r) }
-            | MINUS r:prod              { l = newBinary(sub_proto, l, r) }
+            ( PLUS  r:prod              { l = newBinary(Add_proto, l, r) }
+            | MINUS r:prod              { l = newBinary(Sub_proto, l, r) }
             )*                          { $$ = l }
 
 prod    =   l:prefix
-            ( MULTI     r:prefix        { l = newBinary(mul_proto, l, r) }
-            | DIVIDE    r:prefix        { l = newBinary(div_proto, l, r) }
-            | MODULO    r:prefix        { l = newBinary(mod_proto, l, r) }
+            ( MULTI     r:prefix        { l = newBinary(Mul_proto, l, r) }
+            | DIVIDE    r:prefix        { l = newBinary(Div_proto, l, r) }
+            | MODULO    r:prefix        { l = newBinary(Mod_proto, l, r) }
             )*                          { $$ = l }
 
 prefix  =   PLUS       n:prefix         { $$= n }
-        |   MINUS      n:prefix         { $$= newUnary(neg_proto, n) }
-        |   TILDE      n:prefix         { $$= newUnary(com_proto, n) }
-        |   PLING      n:prefix         { $$= newUnary(not_proto, n) }
+        |   MINUS      n:prefix         { $$= newUnary(Neg_proto, n) }
+        |   TILDE      n:prefix         { $$= newUnary(Com_proto, n) }
+        |   PLING      n:prefix         { $$= newUnary(Not_proto, n) }
         |   PLUSPLUS   n:prefix         { $$= newPreIncrement(n) }
         |   MINUSMINUS n:prefix         { $$= newPreDecrement(n) }
-        |   BACKTICK   n:prefix         { $$ = newUnary(quasiquote_proto, n) }
-        |   AT         n:prefix         { $$ = newUnary(unquote_proto, n) }
+        |   BACKTICK   n:prefix         { $$ = newUnary(Quasiquote_proto, n) }
+        |   AT         n:prefix         { $$ = newUnary(Unquote_proto, n) }
         |              n:postfix        { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
-                    | DOT    s:IDENT        !assignOp           { i = newGetMap(getMember_proto, i, s) }
-                    | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(getIndex_proto, i, p) }
+                    | DOT    s:IDENT        !assignOp           { i = newGetMap(GetMember_proto, i, s) }
+                    | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(GetIndex_proto, i, p) }
                     | a:argumentList                            { i = (null != getSyntax(1, i)) ? apply(getSyntax(1, i), a) : newCall(i, a) }
                     | PLUSPLUS                                  { i = newPostIncrement(i) }
                     | MINUSMINUS                                { i = newPostDecrement(i) }
@@ -845,7 +845,7 @@ oop expandUnquotes(oop scope, oop obj)
     if (!is(Map, obj)) {
         return obj;
     }
-    if (map_get(obj, __proto___symbol) == unquote_proto) {
+    if (map_get(obj, __proto___symbol) == Unquote_proto) {
         return eval(scope, map_get(obj, rhs_symbol));
     }
     for (size_t i= 0;  i < map_size(obj);  ++i) {
@@ -864,19 +864,19 @@ oop fold(oop ast)
     if (null != proto) {
         proto_t proto_number= get(map_get(proto, __name___symbol), Symbol, prototype);
         switch (proto_number) {
-        case t_integer:
-        case t_string:
-        case t_symbol: {
+        case t_Integer:
+        case t_String:
+        case t_Symbol: {
             return map_get(ast, value_symbol);
         }
-        case t_logor: {
+        case t_Logor: {
             oop lhs= map_get(ast, lhs_symbol);
             oop rhs= map_get(ast, rhs_symbol);
             if (isTrue(fold(lhs))) return makeInteger(1);
             if (isTrue(fold(rhs))) return makeInteger(1);
             return makeInteger(0);
         }
-        case t_logand: {
+        case t_Logand: {
             oop lhs= map_get(ast, lhs_symbol);
             oop rhs= map_get(ast, rhs_symbol);
             if (isFalse(fold(lhs))) return makeInteger(0);
@@ -889,31 +889,31 @@ oop fold(oop ast)
             oop rhs= fold(map_get(ast, rhs_symbol));                        \
             return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
         }
-        BINARY(bitor,     | );
-        BINARY(bitxor,    ^ );
-        BINARY(bitand,    & );
-        BINARY(equal,     ==);
-        BINARY(noteq,     !=);
-        BINARY(less,      < );
-        BINARY(lesseq,    <=);
-        BINARY(greatereq, >=);
-        BINARY(greater,   > );
-        BINARY(shleft,    <<);
-        BINARY(shright,   >>);
-        BINARY(add,       + );
-        BINARY(sub,       - );
-        BINARY(mul,       * );
-        BINARY(div,       / );
-        BINARY(mod,       % );
+        BINARY(Bitor,     | );
+        BINARY(Bitxor,    ^ );
+        BINARY(Bitand,    & );
+        BINARY(Equal,     ==);
+        BINARY(Noteq,     !=);
+        BINARY(Less,      < );
+        BINARY(Lesseq,    <=);
+        BINARY(Greatereq, >=);
+        BINARY(Greater,   > );
+        BINARY(Shleft,    <<);
+        BINARY(Shright,   >>);
+        BINARY(Add,       + );
+        BINARY(Sub,       - );
+        BINARY(Mul,       * );
+        BINARY(Div,       / );
+        BINARY(Mod,       % );
 #             undef BINARY
 #             define UNARY(NAME, OPERATOR)                  \
         case t_##NAME: {                                    \
             oop rhs = fold(map_get(ast, rhs_symbol));       \
             return makeInteger(OPERATOR getInteger(rhs));   \
         }
-        UNARY(not, !);
-        UNARY(neg, -);
-        UNARY(com, ~);
+        UNARY(Not, !);
+        UNARY(Neg, -);
+        UNARY(Com, ~);
 #             undef UNARY
             default:
                 break;
@@ -930,16 +930,16 @@ oop applyOperator(oop op, oop lhs, oop rhs)
 {
     if (null != op) {                                                           assert(is(Symbol, op));
     switch (get(op, Symbol, prototype)) {
-        case t_add:     return makeInteger(getInteger(lhs)  + getInteger(rhs));
-        case t_sub:     return makeInteger(getInteger(lhs)  - getInteger(rhs));
-        case t_mul:     return makeInteger(getInteger(lhs)  * getInteger(rhs));
-        case t_div:     return makeInteger(getInteger(lhs)  / getInteger(rhs));
-        case t_mod:     return makeInteger(getInteger(lhs)  % getInteger(rhs));
-        case t_bitor:   return makeInteger(getInteger(lhs)  | getInteger(rhs));
-        case t_bitxor:  return makeInteger(getInteger(lhs)  ^ getInteger(rhs));
-        case t_bitand:  return makeInteger(getInteger(lhs)  & getInteger(rhs));
-        case t_shleft:  return makeInteger(getInteger(lhs) << getInteger(rhs));
-        case t_shright: return makeInteger(getInteger(lhs) >> getInteger(rhs));
+        case t_Add:     return makeInteger(getInteger(lhs)  + getInteger(rhs));
+        case t_Sub:     return makeInteger(getInteger(lhs)  - getInteger(rhs));
+        case t_Mul:     return makeInteger(getInteger(lhs)  * getInteger(rhs));
+        case t_Div:     return makeInteger(getInteger(lhs)  / getInteger(rhs));
+        case t_Mod:     return makeInteger(getInteger(lhs)  % getInteger(rhs));
+        case t_Bitor:   return makeInteger(getInteger(lhs)  | getInteger(rhs));
+        case t_Bitxor:  return makeInteger(getInteger(lhs)  ^ getInteger(rhs));
+        case t_Bitand:  return makeInteger(getInteger(lhs)  & getInteger(rhs));
+        case t_Shleft:  return makeInteger(getInteger(lhs) << getInteger(rhs));
+        case t_Shright: return makeInteger(getInteger(lhs) >> getInteger(rhs));
         default: {
         fprintf(stderr, "\nIllegal operator %i\n", get(op, Symbol, prototype));
         exit(1);
@@ -983,7 +983,7 @@ oop eval(oop scope, oop ast)
         assert(0);
         return 0;
     }
-    case t_map: {
+    case t_Map: {
         oop map= clone(map_get(ast, value_symbol));
         for (size_t i= 0;  i < map_size(map);  ++i) {
             struct Pair *pair= &get(map, Map, elements)[i];
@@ -991,26 +991,26 @@ oop eval(oop scope, oop ast)
         }
         return map;
     }
-    case t_quasiquote: {
+    case t_Quasiquote: {
         oop obj = map_get(ast, rhs_symbol);
         return expandUnquotes(scope, obj);
     }
-    case t_unquote: {
+    case t_Unquote: {
         fprintf(stderr, "\n@ outside of `\n");
         exit(1);
     }
-    case t_declaration: {
+    case t_Declaration: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return newVariable(scope, lhs, rhs);
     }
-    case t_if: {
+    case t_If: {
         oop condition  = map_get(ast, condition_symbol );
         oop consequent = map_get(ast, consequent_symbol);
         oop alternate  = map_get(ast, alternate_symbol );
     return eval(scope, isTrue(eval(scope, condition)) ? consequent : alternate);
     }
-    case t_while: {
+    case t_While: {
         oop condition = map_get(ast, condition_symbol );
         oop body      = map_get(ast, body_symbol);
         oop result    = null;
@@ -1039,7 +1039,7 @@ oop eval(oop scope, oop ast)
         jbRecPop();
         return result;
     }
-    case t_do: {
+    case t_Do: {
         oop body      = map_get(ast, body_symbol);
         oop condition = map_get(ast, condition_symbol );
         oop result    = null;
@@ -1071,7 +1071,7 @@ oop eval(oop scope, oop ast)
         jbRecPop();
         return result;
     }
-    case t_for: {
+    case t_For: {
         oop initialise = map_get(ast, initialise_symbol );
         oop condition  = map_get(ast, condition_symbol );
         oop update     = map_get(ast, update_symbol );
@@ -1105,7 +1105,7 @@ oop eval(oop scope, oop ast)
         }
         return result;
     }
-    case t_switch: {
+    case t_Switch: {
         oop expression = map_get(ast, expression_symbol );
         oop labels     = map_get(ast, labels_symbol );
         oop statements = map_get(ast, statements_symbol );
@@ -1145,7 +1145,7 @@ oop eval(oop scope, oop ast)
         }
         return result;
     }
-    case t_assign: {
+    case t_Assign: {
         oop lhs = map_get(ast, lhs_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
@@ -1156,7 +1156,7 @@ oop eval(oop scope, oop ast)
         }
         return rhs;
     }
-    case t_func: {
+    case t_Func: {
         oop name  = map_get(ast, name_symbol);
         oop param = map_get(ast, param_symbol);
         oop body  = map_get(ast, body_symbol);
@@ -1171,7 +1171,7 @@ oop eval(oop scope, oop ast)
         if (name != null) newVariable(scope, name, func);
         return func;
     }
-    case t_call: {
+    case t_Call: {
         oop func = eval(scope, map_get(ast, func_symbol));
         if (!is(Function, func)) {
             printf("cannot call ");
@@ -1219,7 +1219,7 @@ oop eval(oop scope, oop ast)
         }
         return get(func, Function, primitive)(args);
     }
-    case t_invoke: {
+    case t_Invoke: {
         // this is what differs from t_call
         oop this = eval(scope, map_get(ast, this_symbol));
         oop func = getVariable(this, map_get(ast, name_symbol));
@@ -1269,20 +1269,20 @@ oop eval(oop scope, oop ast)
         return result;
     }
 
-    case t_return: {
+    case t_Return: {
         jbsCheck("return outside a function");
         jbs->result = eval(scope, map_get(ast, value_symbol));
         siglongjmp(jbs->jb, j_return);
     }
-    case t_break: {
+    case t_Break: {
         jbsCheck("break outside a loop");
         siglongjmp(jbs->jb, j_break);
     }
-    case t_continue: {
+    case t_Continue: {
         jbsCheck("continue outside a loop");
         siglongjmp(jbs->jb, j_continue);
     }
-    case t_block: {
+    case t_Block: {
         oop statements = map_get(ast, statements_symbol);
         int i = 0;
         oop index;
@@ -1295,15 +1295,15 @@ oop eval(oop scope, oop ast)
         }
         return res;
     }
-    case t_getVariable: {
+    case t_GetVariable: {
         return getVariable(scope, map_get(ast, key_symbol));
     }
-    case t_getMember: {
+    case t_GetMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
         return getVariable(map, key);
     }
-    case t_setMember: {
+    case t_SetMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
         oop op  = map_get(ast, operator_symbol);
@@ -1315,7 +1315,7 @@ oop eval(oop scope, oop ast)
         return map_set(map, key, value);
     }
 # define SETMEMBEROP(OPERATION, OPERATOR)                                                                       \
-    case t_setMember##OPERATION: {                                                                              \
+    case t_SetMember##OPERATION: {                                                                              \
         oop map = eval(scope, map_get(ast, map_symbol));                                                        \
         oop key = map_get(ast, key_symbol);                                                                     \
         oop value = eval(scope, map_get(ast, value_symbol));                                                    \
@@ -1332,12 +1332,12 @@ oop eval(oop scope, oop ast)
     SETMEMBEROP(Shleft,  <<);
     SETMEMBEROP(Shright, >>);
 # undef SETMEMBEROP
-    case t_getIndex: {
+    case t_GetIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
         return map_get(map, key);
     }
-    case t_setIndex: {
+    case t_SetIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
         oop op  = map_get(ast, operator_symbol);
@@ -1346,7 +1346,7 @@ oop eval(oop scope, oop ast)
         return map_set(map, key, value);
     }
 # define SETINDEXOP(OPERATION, OPERATOR)                                                                      \
-    case t_setIndex##OPERATION: {                                                                             \
+    case t_SetIndex##OPERATION: {                                                                             \
         oop map = eval(scope, map_get(ast, map_symbol));                                                      \
         oop key = eval(scope, map_get(ast, key_symbol));                                                      \
         oop value = eval(scope, map_get(ast, value_symbol));                                                  \
@@ -1363,19 +1363,19 @@ oop eval(oop scope, oop ast)
     SETINDEXOP(Shleft,  <<);
     SETINDEXOP(Shright, >>);
 # undef SETINDEXOP
-    case t_symbol:
-    case t_integer:
-    case t_string: {
+    case t_Symbol:
+    case t_Integer:
+    case t_String: {
         return map_get(ast, value_symbol);
     }
-    case t_logor: {
+    case t_Logor: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = map_get(ast, rhs_symbol);
         if (isTrue(eval(scope, lhs))) return makeInteger(1);
         if (isTrue(eval(scope, rhs))) return makeInteger(1);
         return makeInteger(0);
     }
-    case t_logand: {
+    case t_Logand: {
         oop lhs = map_get(ast, lhs_symbol);
         oop rhs = map_get(ast, rhs_symbol);
         if (isFalse(eval(scope, lhs))) return makeInteger(0);
@@ -1383,7 +1383,7 @@ oop eval(oop scope, oop ast)
         return makeInteger(1);
     }
 # define ASSIGNOP(OPERATION, OPERATOR)                                                      \
-    case t_assign##OPERATION: {                                                             \
+    case t_Assign##OPERATION: {                                                             \
         oop lhs = map_get(ast, lhs_symbol);                                                 \
         oop rhs = eval(scope, map_get(ast, rhs_symbol));                                    \
         oop result = makeInteger(getInteger(eval(scope, lhs)) OPERATOR getInteger(rhs));    \
@@ -1406,24 +1406,24 @@ oop eval(oop scope, oop ast)
         oop rhs = eval(scope ,map_get(ast, rhs_symbol));                \
         return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
     }
-    BINARY(bitor,     | );
-    BINARY(bitxor,    ^ );
-    BINARY(bitand,    & );
-    BINARY(equal,     ==);
-    BINARY(noteq,     !=);
-    BINARY(less,      < );
-    BINARY(lesseq,    <=);
-    BINARY(greatereq, >=);
-    BINARY(greater,   > );
-    BINARY(shleft,    <<);
-    BINARY(shright,   >>);
-    BINARY(add,       + );
-    BINARY(sub,       - );
-    BINARY(mul,       * );
-    BINARY(div,       / );
-    BINARY(mod,       % );
+    BINARY(Bitor,     | );
+    BINARY(Bitxor,    ^ );
+    BINARY(Bitand,    & );
+    BINARY(Equal,     ==);
+    BINARY(Noteq,     !=);
+    BINARY(Less,      < );
+    BINARY(Lesseq,    <=);
+    BINARY(Greatereq, >=);
+    BINARY(Greater,   > );
+    BINARY(Shleft,    <<);
+    BINARY(Shright,   >>);
+    BINARY(Add,       + );
+    BINARY(Sub,       - );
+    BINARY(Mul,       * );
+    BINARY(Div,       / );
+    BINARY(Mod,       % );
 # undef BINARY
-    case t_not: {
+    case t_Not: {
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
         return makeInteger(isFalse(rhs));
     }
@@ -1432,64 +1432,64 @@ oop eval(oop scope, oop ast)
         oop rhs = eval(scope, map_get(ast, rhs_symbol));    \
         return makeInteger(OPERATOR getInteger(rhs));       \
     }
-    UNARY(neg, -);
-    UNARY(com, ~);
+    UNARY(Neg, -);
+    UNARY(Com, ~);
 # undef UNARY
-        case t_preIncVariable: {
+        case t_PreIncVariable: {
             oop key= map_get(ast, key_symbol);
             oop val= getVariable(scope, key);
             val= makeInteger(getInteger(val) + 1);
             return setVariable(scope, key, val);
         }
-        case t_preDecVariable: {
+        case t_PreDecVariable: {
             oop key= map_get(ast, key_symbol);
             oop val= getVariable(scope, key);
             val= makeInteger(getInteger(val) - 1);
             return setVariable(scope, key, val);
         }
-        case t_preIncMember: {
+        case t_PreIncMember: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= map_get(ast, key_symbol);
             oop val= map_get(map, key);
             val= makeInteger(getInteger(val) + 1);
             return map_set(map, key, val);
         }
-        case t_preDecMember: {
+        case t_PreDecMember: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= map_get(ast, key_symbol);
             oop val= map_get(map, key);
             val= makeInteger(getInteger(val) - 1);
             return map_set(map, key, val);
         }
-        case t_preIncIndex: {
+        case t_PreIncIndex: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= eval(scope, map_get(ast, key_symbol));
             oop val= map_get(map, key);
             val= makeInteger(getInteger(val) + 1);
             return map_set(map, key, val);
         }
-        case t_preDecIndex: {
+        case t_PreDecIndex: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= eval(scope, map_get(ast, key_symbol));
             oop val= map_get(map, key);
             val= makeInteger(getInteger(val) - 1);
             return map_set(map, key, val);
         }
-        case t_postIncVariable: {
+        case t_PostIncVariable: {
             oop key= map_get(ast, key_symbol);
             oop val= getVariable(scope, key);
             oop inc= makeInteger(getInteger(val) + 1);
             setVariable(scope, key, inc);
             return val;
         }
-        case t_postDecVariable: {
+        case t_PostDecVariable: {
             oop key= map_get(ast, key_symbol);
             oop val= getVariable(scope, key);
             oop inc= makeInteger(getInteger(val) - 1);
             setVariable(scope, key, inc);
             return val;
         }
-        case t_postIncMember: {
+        case t_PostIncMember: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= map_get(ast, key_symbol);
             oop val= map_get(map, key);
@@ -1497,7 +1497,7 @@ oop eval(oop scope, oop ast)
             map_set(map, key, inc);
             return val;
         }
-        case t_postDecMember: {
+        case t_PostDecMember: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= map_get(ast, key_symbol);
             oop val= map_get(map, key);
@@ -1505,7 +1505,7 @@ oop eval(oop scope, oop ast)
             map_set(map, key, inc);
             return val;
         }
-        case t_postIncIndex: {
+        case t_PostIncIndex: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= eval(scope, map_get(ast, key_symbol));
             oop val= map_get(map, key);
@@ -1513,7 +1513,7 @@ oop eval(oop scope, oop ast)
             map_set(map, key, inc);
             return val;
         }
-        case t_postDecIndex: {
+        case t_PostDecIndex: {
             oop map= eval(scope, map_get(ast, map_symbol));
             oop key= eval(scope, map_get(ast, key_symbol));
             oop val= map_get(map, key);
