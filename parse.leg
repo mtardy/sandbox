@@ -1679,6 +1679,8 @@ oop evalArgs(oop scope, oop args)
    return params;
 }
 
+oop AST= NULL;
+
 int main(int argc, char **argv)
 {
 # if (USE_GC)
@@ -1717,6 +1719,14 @@ int main(int argc, char **argv)
     #define _DO(NAME) NAME##_proto=makeMap(); map_set(NAME##_proto, __name___symbol, NAME##_symbol);
     DO_PROTOS()
     #undef _DO
+
+    AST = makeMap();
+    map_set(globals, intern("AST"), AST);
+    #define _DO(NAME) map_set(AST, NAME##_symbol, NAME##_proto);
+    DO_PROTOS()
+    #undef _DO
+
+    println(AST);
 
     while (yyparse()) {
         if (!yylval) break;             // EOF
