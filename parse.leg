@@ -169,10 +169,10 @@ oop setVariable(oop object, oop key, oop value)
 oop getMember(oop object, oop key)
 {
     if (!map_hasKey(object, key)) {
-	printf("\nUndefined: .");
-	println(key);
-	exit(1);
-	return null;
+        printf("\nUndefined: .");
+        println(key);
+        exit(1);
+        return null;
     }
     return map_get(object, key);
 }
@@ -521,6 +521,37 @@ oop fold(oop ast);
 FILE *input= 0;
 char *fileName= 0;
 
+typedef struct input_t
+{
+    char           *name;
+    struct input_t *next;
+} input_t;
+
+input_t *inputStack= NULL;
+
+void inputStackPush(char *inputName) {
+    printf("IMPUT STACK PUSH: %s\n", inputName);
+    input_t *input= memcheck(malloc(sizeof(input_t)));
+    input->name= memcheck(strdup(inputName));
+    if (NULL == inputStack) {
+        inputStack= input;
+    } else {
+        input_t *cursor= inputStack;
+        while (cursor->next) {
+            cursor= cursor->next;
+        }
+        cursor->next= input;
+    }
+    return;
+}
+
+input_t *inputStackPop(void) {
+    assert(inputStack);
+    input_t *first= inputStack;
+    inputStack= first->next;
+    return first;
+}
+
 #define YY_INPUT(buf, result, max_size)        \
 {                                              \
 int yyc= getc(input);                          \
@@ -586,7 +617,7 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(Assign_proto,    l,    o, e) }
         |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(SetMember_proto, l, i, o, e) }
         |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(SetIndex_proto,  l, i, o, e) }
-	|   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
+        |   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
         |   c:cond                                           { $$ = c }
 
 ident   =   l:IDENT                                          { $$ = l }
@@ -866,9 +897,9 @@ oop expandUnquotes(oop scope, oop obj)
     }
     for (size_t i= 0;  i < map_size(obj);  ++i) {
         struct Pair *pair= &get(obj, Map, elements)[i];
-	if (__proto___symbol != pair->key) {
-	    pair->value= expandUnquotes(scope, pair->value);
-	}
+        if (__proto___symbol != pair->key) {
+            pair->value= expandUnquotes(scope, pair->value);
+        }
     }
     return obj;
 }
@@ -1706,14 +1737,34 @@ void readEvalPrint(void) {
     }
 }
 
+oop prim_import(oop params)
+{
+    // TODO TODO TODO
+    if (map_hasIntegerKey(params, 0)) {
+        char *file= get(get(params, Map, elements)[0].value, String, value);
+        printf("PRIM IMPORT: %s\n", file);
+        inputStackPush(file);
+        /*
+        input = fopen(file, "rb");
+        if (NULL == input) {
+            perror(file);
+            exit(1);
+        }
+        fileName= file;
+        readEvalPrint();
+        */
+    }
+    return null;
+}
+
 int main(int argc, char **argv)
 {
 # if (USE_GC)
     GC_INIT();
 # endif
 
-    symbol_table = makeMap();
-    globals = makeMap();
+    symbol_table= makeMap();
+    globals= makeMap();
 
     map_set(globals, intern("exit")  , makeFunction(prim_exit,   intern("exit"),   null, null, globals, null));
     map_set(globals, intern("keys")  , makeFunction(prim_keys,   intern("keys"),   null, null, globals, null));
@@ -1723,7 +1774,7 @@ int main(int argc, char **argv)
     map_set(globals, intern("invoke"), makeFunction(prim_invoke, intern("invoke"), null, null, globals, null));
     map_set(globals, intern("apply") , makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
     map_set(globals, intern("clone") , makeFunction(prim_clone,  intern("clone"),  null, null, globals, null));
-
+    map_set(globals, intern("import"), makeFunction(prim_import, intern("import"), null, null, globals, null));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
@@ -1746,25 +1797,42 @@ int main(int argc, char **argv)
     while (argc-- > 1) {
         ++argv;
         if (!strcmp(*argv, "-v"))  ++opt_v;
-        if (!strcmp(*argv, "-")) {
-            input= stdin;
-            fileName= "<stdin>";
-            readEvalPrint();
+        else if (!strcmp(*argv, "-")) {
+            inputStackPush("<stdin>");
         }
         else {
-            input = fopen(*argv, "rb");
-            if (NULL == input) {
-                perror(*argv);
-                exit(1);
-            }
-            fileName= *argv;
-            readEvalPrint();
+            inputStackPush(*argv);
         }
     }
-    if (0 == input) {
-        input= stdin;
-        fileName= "<stdin>";
+    if (0 == inputStack) {
+        inputStackPush("<stdin>");
+    }
+
+    while (inputStack) {
+        printf("UNSTACK: %s\n", inputStack->name);
+
+        // set input to stdin or open file
+        if (!strcmp(inputStack->name, "<stdin>")) {
+            input= stdin;
+        } else {
+            input = fopen(inputStack->name, "rb");
+            if (NULL == input) {
+                perror(inputStack->name);
+                exit(1);
+            }
+        }
+        fileName= inputStack->name;
         readEvalPrint();
+
+        // close file
+        if (input != stdin) {
+            int res= fclose(input);
+            if (0 != res) {
+                perror(inputStack->name);
+                exit(1);
+            }
+        }
+        inputStackPop();
     }
 
     return 0;
