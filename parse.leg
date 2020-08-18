@@ -741,8 +741,7 @@ value   =   n:NUMBER                { $$ = newInteger(n) }
 
 string  =   s:STRING -              { $$ = s }
 
-STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE     { $$ = makeString(unescape(yytext)) }
-        |   DQUOTE < (!DQUOTE char)* > DQUOTE     { $$ = makeString(unescape(yytext)) }
+STRING  =   DQUOTE < (!DQUOTE char)* > DQUOTE     { $$ = makeString(unescape(yytext)) }
 
 char    =   '\\' . | .
 
@@ -786,6 +785,7 @@ NUMBER  =    '0b' < [01]+        >                 -   { $$ = makeInteger(strtol
         |    '0x' < [0-9a-fA-F]+ >                 -   { $$ = makeInteger(strtol(yytext, 0, 16)) }
         |    '0'  < [0-7]+       >                 -   { $$ = makeInteger(strtol(yytext, 0,  8)) }
         |         < [0-9]+       >                 -   { $$ = makeInteger(strtol(yytext, 0, 10)) }
+        |    SQUOTE < (!SQUOTE char)  > SQUOTE     -   { $$ = makeInteger(unescape(yytext)[0]) }
 
 FUN     =    'fun'      ![a-zA-Z0-9_] -
 SYNTAX  =    'syntax'   ![a-zA-Z0-9_] -
