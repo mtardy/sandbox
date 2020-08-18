@@ -169,10 +169,10 @@ oop setVariable(oop object, oop key, oop value)
 oop getMember(oop object, oop key)
 {
     if (!map_hasKey(object, key)) {
-	printf("\nUndefined: .");
-	println(key);
-	exit(1);
-	return null;
+        printf("\nUndefined: .");
+        println(key);
+        exit(1);
+        return null;
     }
     return map_get(object, key);
 }
@@ -518,12 +518,47 @@ oop newContinue(void)
 
 oop fold(oop ast);
 
-FILE *input= 0;
-char *fileName= 0;
+typedef struct input_t
+{
+    char           *name;
+    FILE           *file;
+    struct input_t *next;
+    int             lineNumber;
+} input_t;
+
+input_t *inputStack= NULL;
+
+void inputStackPush(char *name) {
+    printf("IMPUT STACK PUSH: %s\n", name);
+    FILE *file = stdin;
+    if (NULL != name) {
+        file= fopen(name, "rb");
+        if (NULL == file) {
+            perror(name);
+            exit(1);
+        }
+    } else {
+        name= "<stdin>";
+    }
+    input_t *input = memcheck(malloc(sizeof(input_t)));
+    input->name= memcheck(strdup(name));
+    input->lineNumber= 1;
+    input->file= file;
+    input->next= inputStack; 
+    inputStack= input;
+    return;
+}
+
+input_t *inputStackPop(void) {
+    assert(inputStack);
+    input_t *first= inputStack;
+    inputStack= first->next;
+    return first;
+}
 
 #define YY_INPUT(buf, result, max_size)        \
 {                                              \
-int yyc= getc(input);                          \
+int yyc= getc(inputStack->file);               \
 result= (EOF == yyc) ? 0 : (*(buf)= yyc, 1);   \
 }
 
@@ -531,12 +566,11 @@ result= (EOF == yyc) ? 0 : (*(buf)= yyc, 1);   \
 
 YYSTYPE yylval;
 
-int lineNumber= 1;
 int errorLine= 1;
 
 void error(char *text)
 {
-    fprintf(stderr, "\nSyntax error in %s near line %i:\n%s\n", fileName, errorLine, text);
+    fprintf(stderr, "\nSyntax error in %s near line %i:\n%s\n", inputStack->name, errorLine, text);
     exit(1);
 }
 
@@ -546,15 +580,15 @@ struct _yycontext;
 
 int yyparsefrom(int (*yystart)(struct _yycontext *yy));
 
-
 %}
 
-start   = - ( e:stmt                                         { yylval = e }
+start   = - ( IMPORT s:STRING                                { yylval = null; inputStackPush(get(s, String, value)) }
+            | e:stmt                                         { yylval = e }
             | !.                                             { yylval = 0 }
             | error
             )
 
-error   =                                                    { errorLine= lineNumber }
+error   =                                                    { errorLine= inputStack->lineNumber }
             eol* < (!eol .)* eol* (!eol .)* >                { error(yytext) }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
@@ -586,7 +620,7 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(Assign_proto,    l,    o, e) }
         |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(SetMember_proto, l, i, o, e) }
         |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(SetIndex_proto,  l, i, o, e) }
-	|   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
+        |   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
         |   c:cond                                           { $$ = c }
 
 ident   =   l:IDENT                                          { $$ = l }
@@ -699,20 +733,22 @@ argumentList = LPAREN  m:makeMap
                 RPAREN              { $$ = m }
 
 value   =   n:NUMBER                { $$ = newInteger(n) }
-        |   s:STRING                { $$ = newString(s) }
+        |   s:string                { $$ = newString(s) }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = newMap(m) }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
         |   LPAREN i:stmt  RPAREN   { $$ = i }
 
-STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE      { $$ = makeString(unescape(yytext)) }
-        |   DQUOTE < (!DQUOTE char)* > DQUOTE      { $$ = makeString(unescape(yytext)) }
+string  =   s:STRING -              { $$ = s }
+
+STRING  =   SQUOTE < (!SQUOTE char)* > SQUOTE     { $$ = makeString(unescape(yytext)) }
+        |   DQUOTE < (!DQUOTE char)* > DQUOTE     { $$ = makeString(unescape(yytext)) }
 
 char    =   '\\' . | .
 
 symbol  =   HASH    ( i:IDENT                   { $$ = newSymbol(i) }
-                    | i:STRING                  { $$ = newSymbol(intern(get(i, String, value))) }
+                    | i:string                  { $$ = newSymbol(intern(get(i, String, value))) }
                     )
 
 map     =   LCB   m:makeMap
@@ -738,7 +774,7 @@ blank   =  space | eol
 space   =  [ \t]
 eol     =  ( "\n""\r"*
            | "\r""\n"*
-           )                      { lineNumber++ }
+           )                      { inputStack->lineNumber++ }
 
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
@@ -767,6 +803,7 @@ NULL    =    'null'     ![a-zA-Z0-9_] -
 RETURN  =    'return'   ![a-zA-Z0-9_] -
 BREAK   =    'break'    ![a-zA-Z0-9_] -
 CONTINUE =   'continue' ![a-zA-Z0-9_] -
+IMPORT  =    'import'   ![a-zA-Z0-9_] -
 HASH    =    '#'                      -
 LOGOR   =    '||'                     -
 LOGAND  =    '&&'                     -
@@ -814,8 +851,8 @@ LBRAC   =    '['                      -
 RBRAC   =    ']'                      -
 LPAREN  =    '('                      -
 RPAREN  =    ')'                      -
-DQUOTE  =    '"'                      -
-SQUOTE  =    "'"                      -
+DQUOTE  =    '"'
+SQUOTE  =    "'"
 
 %%
 ;
@@ -866,9 +903,9 @@ oop expandUnquotes(oop scope, oop obj)
     }
     for (size_t i= 0;  i < map_size(obj);  ++i) {
         struct Pair *pair= &get(obj, Map, elements)[i];
-	if (__proto___symbol != pair->key) {
-	    pair->value= expandUnquotes(scope, pair->value);
-	}
+        if (__proto___symbol != pair->key) {
+            pair->value= expandUnquotes(scope, pair->value);
+        }
     }
     return obj;
 }
@@ -1697,13 +1734,33 @@ oop evalArgs(oop scope, oop args)
 
 oop AST= NULL;
 
-void readEvalPrint(void) {
-    lineNumber = 1;
-    while (yyparse()) {
-        if (!yylval) break;             // EOF
+void readEvalPrint(char *fileName) {
+    inputStackPush(fileName);
+
+    while (inputStack && yyparse()) {
+        if (!yylval) {
+            fclose(inputStack->file);
+            inputStackPop();
+            continue;
+        }             // EOF
         if (opt_v) println(yylval);
         println(eval(globals, yylval));
     }
+}
+
+oop prim_import(oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+        char *file= get(get(params, Map, elements)[0].value, String, value);
+        printf("PRIM IMPORT: %s\n", file);
+        if (yyctx->__pos < yyctx->__limit) {
+            yyctx->__limit--;
+            printf("UNGET: %c\n", yyctx->__buf[yyctx->__limit]);
+            ungetc(yyctx->__buf[yyctx->__limit], inputStack->file);
+        }
+        readEvalPrint(file);
+    }
+    return null;
 }
 
 int main(int argc, char **argv)
@@ -1712,8 +1769,8 @@ int main(int argc, char **argv)
     GC_INIT();
 # endif
 
-    symbol_table = makeMap();
-    globals = makeMap();
+    symbol_table= makeMap();
+    globals= makeMap();
 
     map_set(globals, intern("exit")  , makeFunction(prim_exit,   intern("exit"),   null, null, globals, null));
     map_set(globals, intern("keys")  , makeFunction(prim_keys,   intern("keys"),   null, null, globals, null));
@@ -1723,7 +1780,7 @@ int main(int argc, char **argv)
     map_set(globals, intern("invoke"), makeFunction(prim_invoke, intern("invoke"), null, null, globals, null));
     map_set(globals, intern("apply") , makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
     map_set(globals, intern("clone") , makeFunction(prim_clone,  intern("clone"),  null, null, globals, null));
-
+    map_set(globals, intern("import"), makeFunction(prim_import, intern("import"), null, null, globals, null));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
@@ -1743,29 +1800,51 @@ int main(int argc, char **argv)
     DO_PROTOS()
     #undef _DO
 
+    int repled = 0;
     while (argc-- > 1) {
         ++argv;
         if (!strcmp(*argv, "-v"))  ++opt_v;
-        if (!strcmp(*argv, "-")) {
-            input= stdin;
-            fileName= "<stdin>";
-            readEvalPrint();
+        else if (!strcmp(*argv, "-")) {
+            readEvalPrint(NULL);
+            repled= 1;
         }
         else {
-            input = fopen(*argv, "rb");
-            if (NULL == input) {
-                perror(*argv);
-                exit(1);
-            }
-            fileName= *argv;
-            readEvalPrint();
+            readEvalPrint(*argv);
+            repled= 1;
         }
     }
-    if (0 == input) {
-        input= stdin;
-        fileName= "<stdin>";
-        readEvalPrint();
+    if (!repled) {
+        readEvalPrint(NULL);
     }
+
+/*
+    while (inputStack) {
+        printf("UNSTACK: %s\n", inputStack->name);
+
+        // set input to stdin or open file
+        if (!strcmp(inputStack->name, "<stdin>")) {
+            input= stdin;
+        } else {
+            input = fopen(inputStack->name, "rb");
+            if (NULL == input) {
+                perror(inputStack->name);
+                exit(1);
+            }
+        }
+        fileName= inputStack->name;
+        readEvalPrint();
+
+        // close file
+        if (input != stdin) {
+            int res= fclose(input);
+            if (0 != res) {
+                perror(inputStack->name);
+                exit(1);
+            }
+        }
+        inputStackPop();
+    }
+    */
 
     return 0;
 
