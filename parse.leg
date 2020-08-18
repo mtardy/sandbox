@@ -529,7 +529,6 @@ typedef struct input_t
 input_t *inputStack= NULL;
 
 void inputStackPush(char *name) {
-    printf("IMPUT STACK PUSH: %s\n", name);
     FILE *file = stdin;
     if (NULL != name) {
         file= fopen(name, "rb");
@@ -544,7 +543,7 @@ void inputStackPush(char *name) {
     input->name= memcheck(strdup(name));
     input->lineNumber= 1;
     input->file= file;
-    input->next= inputStack; 
+    input->next= inputStack;
     inputStack= input;
     return;
 }
@@ -1752,10 +1751,8 @@ oop prim_import(oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
         char *file= get(get(params, Map, elements)[0].value, String, value);
-        printf("PRIM IMPORT: %s\n", file);
         if (yyctx->__pos < yyctx->__limit) {
             yyctx->__limit--;
-            printf("UNGET: %c\n", yyctx->__buf[yyctx->__limit]);
             ungetc(yyctx->__buf[yyctx->__limit], inputStack->file);
         }
         readEvalPrint(file);
@@ -1816,35 +1813,6 @@ int main(int argc, char **argv)
     if (!repled) {
         readEvalPrint(NULL);
     }
-
-/*
-    while (inputStack) {
-        printf("UNSTACK: %s\n", inputStack->name);
-
-        // set input to stdin or open file
-        if (!strcmp(inputStack->name, "<stdin>")) {
-            input= stdin;
-        } else {
-            input = fopen(inputStack->name, "rb");
-            if (NULL == input) {
-                perror(inputStack->name);
-                exit(1);
-            }
-        }
-        fileName= inputStack->name;
-        readEvalPrint();
-
-        // close file
-        if (input != stdin) {
-            int res= fclose(input);
-            if (0 != res) {
-                perror(inputStack->name);
-                exit(1);
-            }
-        }
-        inputStackPop();
-    }
-    */
 
     return 0;
 
