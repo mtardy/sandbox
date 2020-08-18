@@ -1387,15 +1387,45 @@ oop eval(oop scope, oop ast)
     case t_GetIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
-        return map_get(map, key);
+        switch (getType(map)) {
+            case String:
+                if (getInteger(key) >= get(map, String, size)) {
+                    fprintf(stderr, "\nGetIndex out of range on String\n");
+                    exit(1);
+                }
+                return makeInteger(unescape(get(map, String, value))[getInteger(key)]);
+            case Map:
+                return map_get(map, key);
+            default:
+                // should it returns null instead?
+                fprintf(stderr, "\nGetIndex on non Map or String\n");
+                exit(1);
+        }
     }
     case t_SetIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
         oop op  = map_get(ast, operator_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
-    if (null != op) value= applyOperator(op, map_get(map, key), value);
-        return map_set(map, key, value);
+        switch (getType(map)) {
+            case String:
+                if (getInteger(key) >= get(map, String, size)) {
+                    fprintf(stderr, "\nSetIndex out of range on String\n");
+                    exit(1);
+                }
+                get(map, String, value)[getInteger(key)] = getInteger(value);
+                return value;
+            case Map:
+                if (null != op) {
+                    value= applyOperator(op, map_get(map, key), value);
+                }
+                return map_set(map, key, value);
+            default:
+                // should it returns null instead?
+                fprintf(stderr, "\nSetIndex on non Map or String\n");
+                exit(1);
+        }
+        
     }
 # define SETINDEXOP(OPERATION, OPERATOR)                                                                      \
     case t_SetIndex##OPERATION: {                                                                             \
