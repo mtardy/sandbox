@@ -230,6 +230,22 @@ oop string_concat(oop str1, oop str2)
     return newString;
 }
 
+oop string_mul(oop str, oop factor)
+{
+    ssize_t len = string_size(str) * getInteger(factor);
+    if (len < 0) len = 0;
+    char *concat = memcheck(malloc(sizeof(char) * len + 1));
+    for (int i=0; i < getInteger(factor); ++i) {
+        memcpy(concat + (i * string_size(str)), get(str, String, value), string_size(str));
+    }
+    concat[len]= '\0';
+    oop newString = memcheck(malloc(sizeof(union object)));
+    newString->type = String;
+    newString->String.value = concat;
+    newString->String.size = len;
+    return newString;
+}
+
 oop makeSymbol(char *name)
 {
     oop newSymb = memcheck(malloc(sizeof(union object)));

@@ -7,9 +7,8 @@
  */
 
 #define DO_PROTOS()                                                                                             \
-    _DO(If) _DO(While) _DO(Do) _DO(For) _DO(Switch) _DO(Call) _DO(Invoke) _DO(Func) _DO(Block) _DO(Declaration) \
-    _DO(Assign) _DO(AssignAdd) _DO(AssignSub) _DO(AssignMul) _DO(AssignDiv) _DO(AssignMod)                      \
-    _DO(AssignBitor) _DO(AssignBitxor) _DO(AssignBitand) _DO(AssignShleft) _DO(AssignShright)                   \
+    _DO(If) _DO(While) _DO(Do) _DO(For) _DO(Switch) _DO(Call) _DO(Invoke) _DO(Func) _DO(Block)                  \
+    _DO(Declaration) _DO(Assign)                                                                                \
     _DO(Map) _DO(Symbol) _DO(Integer) _DO(String)                                                               \
     _DO(Logor) _DO(Logand) _DO(Bitor) _DO(Bitxor) _DO(Bitand)                                                   \
     _DO(Equal) _DO(Noteq) _DO(Less) _DO(Lesseq) _DO(Greater) _DO(Greatereq) _DO(Shleft) _DO(Shright)            \
@@ -19,10 +18,6 @@
     _DO(PreDecVariable) _DO(PreDecMember) _DO(PreDecIndex)                                                      \
     _DO(PostDecVariable) _DO(PostDecMember) _DO(PostDecIndex)                                                   \
     _DO(GetVariable) _DO(GetMember) _DO(SetMember) _DO(GetIndex) _DO(SetIndex)                                  \
-    _DO(SetMemberAdd) _DO(SetMemberSub) _DO(SetMemberMul) _DO(SetMemberDiv) _DO(SetMemberMod)                   \
-    _DO(SetMemberBitor) _DO(SetMemberBitxor) _DO(SetMemberBitand) _DO(SetMemberShleft) _DO(SetMemberShright)    \
-    _DO(SetIndexAdd) _DO(SetIndexSub) _DO(SetIndexMul) _DO(SetIndexDiv) _DO(SetIndexMod)                        \
-    _DO(SetIndexBitor) _DO(SetIndexBitxor) _DO(SetIndexBitand) _DO(SetIndexShleft) _DO(SetIndexShright)         \
     _DO(Return) _DO(Break) _DO(Continue)                                                                        \
     _DO(Quasiquote) _DO(Unquote)
 
@@ -903,6 +898,20 @@ oop addOperation(oop lhs, oop rhs)
     }
 }
 
+oop mulOperation(oop lhs, oop rhs)
+{
+    if (getType(lhs) == Integer && getType(rhs) == Integer) {
+        return makeInteger(getInteger(lhs) * getInteger(rhs));
+    } else if (getType(lhs) == String && getType(rhs) == Integer) {
+        return string_mul(lhs, rhs);
+    } else if (getType(lhs) == Integer && getType(rhs) == String) {
+        return string_mul(rhs, lhs);
+    } else {
+        fprintf(stderr, "\nmultiplication between two incompatible types\n");
+        exit(1);
+    }
+}
+
 oop expandUnquotes(oop scope, oop obj)
 {
     obj = clone(obj);
@@ -1462,7 +1471,12 @@ oop eval(oop scope, oop ast)
         return addOperation(lhs, rhs);
     }
     BINARY(Sub,       - );
-    BINARY(Mul,       * );
+//  BINARY(Mul,       * );
+    case t_Mul: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return mulOperation(lhs, rhs);
+    }
     BINARY(Div,       / );
     BINARY(Mod,       % );
 # undef BINARY
