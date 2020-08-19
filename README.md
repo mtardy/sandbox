@@ -1,14 +1,14 @@
-# Javascrypt
+# Sandbox
 
 ## Build the project
 ### Requirements
 
-Please install [peg/leg](https://www.piumarta.com/software/peg/) manually or with Homebrew: 
+Please install [peg/leg](https://www.piumarta.com/software/peg/) manually or with a package manager, for example with Homebrew: 
 ```bash
 $ brew install peg
 ```
 
-Please install [the Boehm-Demers-Weiser conservative garbage collector](https://www.hboehm.info/gc/) manually or with Homebrew:
+Please install [the Boehm-Demers-Weiser conservative garbage collector](https://www.hboehm.info/gc/) manually or with a package manager, for example with Homebrew:
 ```bash
 $ brew install bdw-gc
 ```
@@ -23,30 +23,32 @@ $ make
 
 The Docker image provides a ready to go environment to experiment with the project. Just build the image locally and run an interactive shell inside the container:
 ```bash
-$ docker build . --tag mtardy/javascrypt
-$ docker run -it mtardy/javascrypt
+$ docker build . --tag mtardy/sandbox
+$ docker run -it mtardy/sandbox
 ```
 
 ---
 
 ## Usage
-
+### Single input
+You can pass your program:
+* via the standard input
 ```bash
-$ echo "a=2+3 a*2" | ./calc
+$ echo "a=2+3 a*2" | ./parse
 ```
-or
 ```bash
-$ ./calc < file
+$ ./parse < file
 ```
-
-## Tests
-
-Simple tests:
+* via a file
 ```bash
-$ tests/test.sh
+$ ./parse file
 ```
 
-Custom test:
+### Multiple inputs
+You can also pass multiple files and use `-` in any order as the standard input when mixing files and standard input, for example:
 ```bash
-$ ./calc < tests/test.txt
+$ ./parse file1 - file2 < file3
+```
+```bash
+$ echo "a=2+3 a*2" | ./parse file1 file2 -
 ```
