@@ -891,6 +891,18 @@ oop clone(oop obj)
     return obj;
 }
 
+oop addOperation(oop lhs, oop rhs) 
+{
+    if (getType(lhs) == Integer && getType(rhs) == Integer) {
+        return makeInteger(getInteger(lhs) + getInteger(rhs));
+    } else if (getType(lhs) == String && getType(rhs) == String) {
+        return string_concat(lhs, rhs);
+    } else {
+        fprintf(stderr, "\naddition between two incompatible types\n");
+        exit(1);
+    }
+}
+
 oop expandUnquotes(oop scope, oop obj)
 {
     obj = clone(obj);
@@ -982,7 +994,7 @@ oop applyOperator(oop op, oop lhs, oop rhs)
 {
     if (null != op) {                                                           assert(is(Symbol, op));
     switch (get(op, Symbol, prototype)) {
-        case t_Add:     return makeInteger(getInteger(lhs)  + getInteger(rhs));
+        case t_Add:     return addOperation(lhs, rhs);
         case t_Sub:     return makeInteger(getInteger(lhs)  - getInteger(rhs));
         case t_Mul:     return makeInteger(getInteger(lhs)  * getInteger(rhs));
         case t_Div:     return makeInteger(getInteger(lhs)  / getInteger(rhs));
@@ -1201,7 +1213,7 @@ oop eval(oop scope, oop ast)
         oop lhs = map_get(ast, lhs_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-    if (null != op) rhs= applyOperator(op, getVariable(scope, lhs), rhs);
+        if (null != op) rhs= applyOperator(op, getVariable(scope, lhs), rhs);
         setVariable(scope, lhs, rhs);
         if (is(Function, rhs) && null == get(rhs, Function, name)) {
             set(rhs, Function, name, lhs);
@@ -1360,7 +1372,7 @@ oop eval(oop scope, oop ast)
         oop key = map_get(ast, key_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
-    if (null != op) value= applyOperator(op, getMember(map, key), value);
+        if (null != op) value= applyOperator(op, getMember(map, key), value);
         if (is(Function, value) && null == get(value, Function, name)) {
             set(value, Function, name, key);
         }
@@ -1416,16 +1428,14 @@ oop eval(oop scope, oop ast)
                 get(map, String, value)[getInteger(key)] = getInteger(value);
                 return value;
             case Map:
-                if (null != op) {
-                    value= applyOperator(op, map_get(map, key), value);
-                }
+                if (null != op) value= applyOperator(op, map_get(map, key), value);
                 return map_set(map, key, value);
             default:
                 // should it returns null instead?
                 fprintf(stderr, "\nSetIndex on non Map or String\n");
                 exit(1);
         }
-        
+
     }
 # define SETINDEXOP(OPERATION, OPERATOR)                                                                      \
     case t_SetIndex##OPERATION: {                                                                             \
@@ -1471,7 +1481,13 @@ oop eval(oop scope, oop ast)
         oop result = makeInteger(getInteger(eval(scope, lhs)) OPERATOR getInteger(rhs));    \
         return setVariable(scope, lhs, result);                                             \
     }
-    ASSIGNOP(Add,     +);
+//  ASSIGNOP(Add,     +);
+    case t_AssignAdd: {
+        oop lhs = map_get(ast, lhs_symbol);
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        oop result = addOperation(eval(scope, lhs), rhs);
+        return setVariable(scope, lhs, result);
+    }
     ASSIGNOP(Sub,     -);
     ASSIGNOP(Mul,     *);
     ASSIGNOP(Div,     /);
@@ -1485,7 +1501,7 @@ oop eval(oop scope, oop ast)
 # define BINARY(NAME, OPERATOR)                                         \
     case t_##NAME: {                                                    \
         oop lhs = eval(scope, map_get(ast, lhs_symbol));                \
-        oop rhs = eval(scope ,map_get(ast, rhs_symbol));                \
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));                \
         return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
     }
     BINARY(Bitor,     | );
@@ -1499,7 +1515,12 @@ oop eval(oop scope, oop ast)
     BINARY(Greater,   > );
     BINARY(Shleft,    <<);
     BINARY(Shright,   >>);
-    BINARY(Add,       + );
+//  BINARY(Add,       + );
+    case t_Add: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return addOperation(lhs, rhs);
+    }
     BINARY(Sub,       - );
     BINARY(Mul,       * );
     BINARY(Div,       / );
@@ -1643,7 +1664,7 @@ oop prim_length(oop params)
     if (map_hasIntegerKey(params, 0)) {
         oop arg= get(params, Map, elements)[0].value;
         switch (getType(arg)) {
-            case String: return makeInteger(strlen(get(arg, String, value)));
+            case String: return makeInteger(string_size(arg));
             case Symbol: return makeInteger(strlen(get(arg, Symbol, name)));
             case Map:    return makeInteger(map_size(arg));
             default:     break;

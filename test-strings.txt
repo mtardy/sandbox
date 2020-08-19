@@ -1,0 +1,10 @@
+str = "hello"
+wrl = " world!"
+str[1]='a'
+str[1]
+str
+length(str)
+new = str + wrl
+print("length is: ", length(new), "\n");
+a = { str1: "hello", str2: " japan!" }
+a[#str1]+=a[#str2]
