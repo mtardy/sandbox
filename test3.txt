@@ -1,9 +1,0 @@
-var num = `4;             // THESE ARE THE
-var ast = `(3+@num);      // IMPORTANT 2 LINES
-
-fun f() {
-    var c = `4+3
-    return 5 + @c
-}
-
-f()
