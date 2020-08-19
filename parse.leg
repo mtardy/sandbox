@@ -891,7 +891,7 @@ oop clone(oop obj)
     return obj;
 }
 
-oop addOperation(oop lhs, oop rhs) 
+oop addOperation(oop lhs, oop rhs)
 {
     if (getType(lhs) == Integer && getType(rhs) == Integer) {
         return makeInteger(getInteger(lhs) + getInteger(rhs));
@@ -1005,8 +1005,8 @@ oop applyOperator(oop op, oop lhs, oop rhs)
         case t_Shleft:  return makeInteger(getInteger(lhs) << getInteger(rhs));
         case t_Shright: return makeInteger(getInteger(lhs) >> getInteger(rhs));
         default: {
-        fprintf(stderr, "\nIllegal operator %i\n", get(op, Symbol, prototype));
-        exit(1);
+            fprintf(stderr, "\nIllegal operator %i\n", get(op, Symbol, prototype));
+            exit(1);
         }
     }
     }
@@ -1378,24 +1378,6 @@ oop eval(oop scope, oop ast)
         }
         return map_set(map, key, value);
     }
-# define SETMEMBEROP(OPERATION, OPERATOR)                                                                       \
-    case t_SetMember##OPERATION: {                                                                              \
-        oop map = eval(scope, map_get(ast, map_symbol));                                                        \
-        oop key = map_get(ast, key_symbol);                                                                     \
-        oop value = eval(scope, map_get(ast, value_symbol));                                                    \
-        return map_set(map, key, makeInteger(getInteger(getVariable(map, key)) OPERATOR getInteger(value)));    \
-    }
-    SETMEMBEROP(Add,     +);
-    SETMEMBEROP(Sub,     -);
-    SETMEMBEROP(Mul,     *);
-    SETMEMBEROP(Div,     /);
-    SETMEMBEROP(Mod,     %);
-    SETMEMBEROP(Bitor,   |);
-    SETMEMBEROP(Bitxor,  ^);
-    SETMEMBEROP(Bitand,  &);
-    SETMEMBEROP(Shleft,  <<);
-    SETMEMBEROP(Shright, >>);
-# undef SETMEMBEROP
     case t_GetIndex: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = eval(scope, map_get(ast, key_symbol));
@@ -1437,24 +1419,6 @@ oop eval(oop scope, oop ast)
         }
 
     }
-# define SETINDEXOP(OPERATION, OPERATOR)                                                                      \
-    case t_SetIndex##OPERATION: {                                                                             \
-        oop map = eval(scope, map_get(ast, map_symbol));                                                      \
-        oop key = eval(scope, map_get(ast, key_symbol));                                                      \
-        oop value = eval(scope, map_get(ast, value_symbol));                                                  \
-        return map_set(map, key, makeInteger(getInteger(getVariable(map, key)) OPERATOR getInteger(value)));  \
-    }
-    SETINDEXOP(Add,     +);
-    SETINDEXOP(Sub,     -);
-    SETINDEXOP(Mul,     *);
-    SETINDEXOP(Div,     /);
-    SETINDEXOP(Mod,     %);
-    SETINDEXOP(Bitor,   |);
-    SETINDEXOP(Bitxor,  ^);
-    SETINDEXOP(Bitand,  &);
-    SETINDEXOP(Shleft,  <<);
-    SETINDEXOP(Shright, >>);
-# undef SETINDEXOP
     case t_Symbol:
     case t_Integer:
     case t_String: {
@@ -1474,30 +1438,6 @@ oop eval(oop scope, oop ast)
         if (isFalse(eval(scope, rhs))) return makeInteger(0);
         return makeInteger(1);
     }
-# define ASSIGNOP(OPERATION, OPERATOR)                                                      \
-    case t_Assign##OPERATION: {                                                             \
-        oop lhs = map_get(ast, lhs_symbol);                                                 \
-        oop rhs = eval(scope, map_get(ast, rhs_symbol));                                    \
-        oop result = makeInteger(getInteger(eval(scope, lhs)) OPERATOR getInteger(rhs));    \
-        return setVariable(scope, lhs, result);                                             \
-    }
-//  ASSIGNOP(Add,     +);
-    case t_AssignAdd: {
-        oop lhs = map_get(ast, lhs_symbol);
-        oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        oop result = addOperation(eval(scope, lhs), rhs);
-        return setVariable(scope, lhs, result);
-    }
-    ASSIGNOP(Sub,     -);
-    ASSIGNOP(Mul,     *);
-    ASSIGNOP(Div,     /);
-    ASSIGNOP(Mod,     %);
-    ASSIGNOP(Bitor,   |);
-    ASSIGNOP(Bitxor,  ^);
-    ASSIGNOP(Bitand,  &);
-    ASSIGNOP(Shleft,  <<);
-    ASSIGNOP(Shright, >>);
-# undef ASSIGNOP
 # define BINARY(NAME, OPERATOR)                                         \
     case t_##NAME: {                                                    \
         oop lhs = eval(scope, map_get(ast, lhs_symbol));                \
@@ -1538,92 +1478,92 @@ oop eval(oop scope, oop ast)
     UNARY(Neg, -);
     UNARY(Com, ~);
 # undef UNARY
-        case t_PreIncVariable: {
-            oop key= map_get(ast, key_symbol);
-            oop val= getVariable(scope, key);
-            val= makeInteger(getInteger(val) + 1);
-            return setVariable(scope, key, val);
-        }
-        case t_PreDecVariable: {
-            oop key= map_get(ast, key_symbol);
-            oop val= getVariable(scope, key);
-            val= makeInteger(getInteger(val) - 1);
-            return setVariable(scope, key, val);
-        }
-        case t_PreIncMember: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= map_get(ast, key_symbol);
-            oop val= map_get(map, key);
-            val= makeInteger(getInteger(val) + 1);
-            return map_set(map, key, val);
-        }
-        case t_PreDecMember: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= map_get(ast, key_symbol);
-            oop val= map_get(map, key);
-            val= makeInteger(getInteger(val) - 1);
-            return map_set(map, key, val);
-        }
-        case t_PreIncIndex: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= eval(scope, map_get(ast, key_symbol));
-            oop val= map_get(map, key);
-            val= makeInteger(getInteger(val) + 1);
-            return map_set(map, key, val);
-        }
-        case t_PreDecIndex: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= eval(scope, map_get(ast, key_symbol));
-            oop val= map_get(map, key);
-            val= makeInteger(getInteger(val) - 1);
-            return map_set(map, key, val);
-        }
-        case t_PostIncVariable: {
-            oop key= map_get(ast, key_symbol);
-            oop val= getVariable(scope, key);
-            oop inc= makeInteger(getInteger(val) + 1);
-            setVariable(scope, key, inc);
-            return val;
-        }
-        case t_PostDecVariable: {
-            oop key= map_get(ast, key_symbol);
-            oop val= getVariable(scope, key);
-            oop inc= makeInteger(getInteger(val) - 1);
-            setVariable(scope, key, inc);
-            return val;
-        }
-        case t_PostIncMember: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= map_get(ast, key_symbol);
-            oop val= map_get(map, key);
-            oop inc= makeInteger(getInteger(val) + 1);
-            map_set(map, key, inc);
-            return val;
-        }
-        case t_PostDecMember: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= map_get(ast, key_symbol);
-            oop val= map_get(map, key);
-            oop inc= makeInteger(getInteger(val) - 1);
-            map_set(map, key, inc);
-            return val;
-        }
-        case t_PostIncIndex: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= eval(scope, map_get(ast, key_symbol));
-            oop val= map_get(map, key);
-            oop inc= makeInteger(getInteger(val) + 1);
-            map_set(map, key, inc);
-            return val;
-        }
-        case t_PostDecIndex: {
-            oop map= eval(scope, map_get(ast, map_symbol));
-            oop key= eval(scope, map_get(ast, key_symbol));
-            oop val= map_get(map, key);
-            oop inc= makeInteger(getInteger(val) - 1);
-            map_set(map, key, inc);
-            return val;
-        }
+    case t_PreIncVariable: {
+        oop key= map_get(ast, key_symbol);
+        oop val= getVariable(scope, key);
+        val= makeInteger(getInteger(val) + 1);
+        return setVariable(scope, key, val);
+    }
+    case t_PreDecVariable: {
+        oop key= map_get(ast, key_symbol);
+        oop val= getVariable(scope, key);
+        val= makeInteger(getInteger(val) - 1);
+        return setVariable(scope, key, val);
+    }
+    case t_PreIncMember: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= map_get(ast, key_symbol);
+        oop val= map_get(map, key);
+        val= makeInteger(getInteger(val) + 1);
+        return map_set(map, key, val);
+    }
+    case t_PreDecMember: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= map_get(ast, key_symbol);
+        oop val= map_get(map, key);
+        val= makeInteger(getInteger(val) - 1);
+        return map_set(map, key, val);
+    }
+    case t_PreIncIndex: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= eval(scope, map_get(ast, key_symbol));
+        oop val= map_get(map, key);
+        val= makeInteger(getInteger(val) + 1);
+        return map_set(map, key, val);
+    }
+    case t_PreDecIndex: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= eval(scope, map_get(ast, key_symbol));
+        oop val= map_get(map, key);
+        val= makeInteger(getInteger(val) - 1);
+        return map_set(map, key, val);
+    }
+    case t_PostIncVariable: {
+        oop key= map_get(ast, key_symbol);
+        oop val= getVariable(scope, key);
+        oop inc= makeInteger(getInteger(val) + 1);
+        setVariable(scope, key, inc);
+        return val;
+    }
+    case t_PostDecVariable: {
+        oop key= map_get(ast, key_symbol);
+        oop val= getVariable(scope, key);
+        oop inc= makeInteger(getInteger(val) - 1);
+        setVariable(scope, key, inc);
+        return val;
+    }
+    case t_PostIncMember: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= map_get(ast, key_symbol);
+        oop val= map_get(map, key);
+        oop inc= makeInteger(getInteger(val) + 1);
+        map_set(map, key, inc);
+        return val;
+    }
+    case t_PostDecMember: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= map_get(ast, key_symbol);
+        oop val= map_get(map, key);
+        oop inc= makeInteger(getInteger(val) - 1);
+        map_set(map, key, inc);
+        return val;
+    }
+    case t_PostIncIndex: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= eval(scope, map_get(ast, key_symbol));
+        oop val= map_get(map, key);
+        oop inc= makeInteger(getInteger(val) + 1);
+        map_set(map, key, inc);
+        return val;
+    }
+    case t_PostDecIndex: {
+        oop map= eval(scope, map_get(ast, map_symbol));
+        oop key= eval(scope, map_get(ast, key_symbol));
+        oop val= map_get(map, key);
+        oop inc= makeInteger(getInteger(val) - 1);
+        map_set(map, key, inc);
+        return val;
+    }
     }
     printf("EVAL ");
     println(ast);
