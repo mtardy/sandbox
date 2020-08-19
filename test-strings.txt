@@ -8,3 +8,7 @@ new = str + wrl
 print("length is: ", length(new), "\n");
 a = { str1: "hello", str2: " japan!" }
 a[#str1]+=a[#str2]
+str * 10
+str * -1
+str * str
+str[0:5]="ok"
