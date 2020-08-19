@@ -211,6 +211,21 @@ oop makeString(char *value)
     return newString;
 }
 
+size_t string_size(oop s)
+{
+    return get(s, String, size);
+}
+
+oop string_concat(oop str1, oop str2)
+{
+    size_t len = string_size(str1) + string_size(str2);
+    char *concat = memcheck(malloc(sizeof(char) * len));
+    memcpy(concat, get(str1, String, value), string_size(str1));
+    memcpy(concat + string_size(str1), get(str2, String, value), string_size(str2));
+    // it will strdup concat, is it bad?
+    return makeString(concat);
+}
+
 oop makeSymbol(char *name)
 {
     oop newSymb = memcheck(malloc(sizeof(union object)));
