@@ -1,8 +1,7 @@
-a = {}
-a.b = fun () {
-    switch (1) {
-        case 1:
-            throw { name: "EvalError", message: "oops" }
-    }
+try {
+    print("hello")
+} catch (e) {
+    print("catch!")
+} finally {
+    print("finally...")
 }
-invoke(a, a.b, {})

@@ -18,7 +18,7 @@
     _DO(PreDecVariable) _DO(PreDecMember) _DO(PreDecIndex)                                                      \
     _DO(PostDecVariable) _DO(PostDecMember) _DO(PostDecIndex)                                                   \
     _DO(GetVariable) _DO(GetMember) _DO(SetMember) _DO(GetIndex) _DO(SetIndex)                                  \
-    _DO(Return) _DO(Break) _DO(Continue) _DO(Throw)                                                             \
+    _DO(Return) _DO(Break) _DO(Continue) _DO(Throw) _DO(Try)                                                    \
     _DO(Quasiquote) _DO(Unquote)
 
 typedef enum {
@@ -73,7 +73,8 @@ oop globals= 0;
      DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__) _DO(__arguments__)                               \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
-    _DO(update) _DO(this) _DO(fixed) _DO(operator) _DO(map) _DO(func)
+    _DO(update) _DO(this) _DO(fixed) _DO(operator) _DO(map) _DO(func)                                           \
+    _DO(try) _DO(catch) _DO(finally) _DO(exception)
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -504,6 +505,16 @@ oop newContinue(void)
     return obj;
 }
 
+oop newTry(oop try, oop exception, oop catch, oop finally)
+{
+    oop obj = newObject(Try_proto);
+    map_set(obj, try_symbol, try);
+    map_set(obj, exception_symbol, exception);
+    map_set(obj, catch_symbol, catch);
+    map_set(obj, finally_symbol, finally);
+    return obj;
+}
+
 oop fold(oop ast);
 
 typedef struct input_t
@@ -605,6 +616,7 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   BREAK                                            { $$ = newBreak() }
         |   CONTINUE                                         { $$ = newContinue() }
         |   THROW                                    e:exp   { $$ = newUnary(Throw_proto, e) }
+        |   t:try                                            { $$ = t }
         |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(Assign_proto,    l,    o, e) }
         |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(SetMember_proto, l, i, o, e) }
         |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(SetIndex_proto,  l, i, o, e) }
@@ -616,6 +628,12 @@ ident   =   l:IDENT                                          { $$ = l }
 
 syntax2  = < [a-zA-Z_][a-zA-Z0-9_]* >
            &{ null != getSyntaxId(2, intern(yytext)) }   -   { $$ = getSyntaxId(2, intern(yytext)) }
+
+try     =   TRY                           t:stmt              i:null c:null f:null
+            ( CATCH LPAREN i:IDENT RPAREN c:stmt ) ?
+            ( FINALLY                     f:stmt ) ?         { $$ = newTry(t, i, c, f) }
+
+null    =                                                    { $$ = null }
 
 assignOp = ASSIGN                 { $$= null }
          | ASSIGNADD              { $$= Add_symbol }
@@ -766,7 +784,8 @@ eol     =  ( "\n""\r"*
 comment =  "//"  ( ![\n\r] . )*
         |  "/*"  ( !"*/"   . )* "*/"
 
-keyword = FUN | SYNTAX | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL | RETURN | BREAK | CONTINUE | THROW
+keyword = FUN | SYNTAX | VAR | SWITCH | CASE | DEFAULT | DO | FOR | WHILE | IF | ELSE | NULL | RETURN | BREAK | CONTINUE
+        | THROW | TRY | CATCH | FINALLY
 
 IDENT   =    !keyword < [a-zA-Z_][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 
@@ -792,6 +811,9 @@ RETURN  =    'return'   ![a-zA-Z0-9_] -
 BREAK   =    'break'    ![a-zA-Z0-9_] -
 CONTINUE =   'continue' ![a-zA-Z0-9_] -
 THROW   =    'throw'    ![a-zA-Z0-9_] -
+TRY     =    'try'      ![a-zA-Z0-9_] -
+CATCH   =    'catch'    ![a-zA-Z0-9_] -
+FINALLY =    'finally'  ![a-zA-Z0-9_] -
 IMPORT  =    'import'   ![a-zA-Z0-9_] -
 HASH    =    '#'                      -
 LOGOR   =    '||'                     -
@@ -1375,6 +1397,39 @@ oop eval(oop scope, oop ast)
         assert(jbs);
         jbs->result = eval(scope, map_get(ast, rhs_symbol));
         siglongjmp(jbs->jb, j_throw);
+    }
+    case t_Try: {
+        oop try = map_get(ast, try_symbol);
+        oop exception = map_get(ast, exception_symbol);
+        oop catch = map_get(ast, catch_symbol);
+        oop finally = map_get(ast, finally_symbol);
+
+        jbRecPush();
+        int jbt = sigsetjmp(jbs->jb, 0);
+        switch (jbt) {
+            case j_return: {
+                oop result = jbs->result;
+                jbRecPop();
+                return result;
+            }
+            case j_break: {
+                fprintf(stderr, "\nbreak outside of a loop\n");
+                exit(1);
+            }
+            case j_continue: {
+                fprintf(stderr, "\ncontinue outside of a loop\n");
+                exit(1);
+            }
+            case j_throw: {
+                oop res= jbs->result;
+                jbRecPop();
+                jbs->result= res;
+                siglongjmp(jbs->jb, j_throw);
+            }
+        }
+
+        jbRecPop();
+        return; 
     }
     case t_Block: {
         oop statements = map_get(ast, statements_symbol);
