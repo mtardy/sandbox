@@ -1,9 +1,8 @@
-var num = `4;             // THESE ARE THE
-var ast = `(3+@num);      // IMPORTANT 2 LINES
-
-fun f() {
-    var c = `4+3
-    return 5 + @c
+a = {}
+a.b = fun () {
+    switch (1) {
+        case 1:
+            throw { name: "EvalError", message: "oops" }
+    }
 }
-
-f()
+invoke(a, a.b, {})
