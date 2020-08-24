@@ -1,4 +1,7 @@
-fun println() { apply(print, __arguments__); print("\n"); }
+fun println() {
+    apply(print, __arguments__);
+    print("\n");
+}
 
 var Object = { __name__: #"Object" };
 

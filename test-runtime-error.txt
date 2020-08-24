@@ -1,0 +1,6 @@
+2;
+12;
+(3*null);
+a = {}
+a.piz = fun f() {continue;}
+`invoke(a, (a.piz), {})

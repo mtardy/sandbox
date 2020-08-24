@@ -1,8 +1,0 @@
-a = {}
-a.b = fun () {
-    switch (1) {
-        case 1:
-            throw { name: "EvalError", message: "oops" }
-    }
-}
-invoke(a, a.b, {})
