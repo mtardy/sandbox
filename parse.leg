@@ -851,14 +851,17 @@ SQUOTE  =    "'"
 %%
 ;
 
+
 oop map_zip(oop keys, oop values)
 {
     assert(is(Map, keys));
     assert(is(Map, values));
     oop map= makeMap();
-    for (int i= 0;  map_hasIntegerKey(keys, i) && map_hasIntegerKey(values, i);  ++i) {
-        oop key   = get(keys,   Map, elements)[i].value;
-        oop value = get(values, Map, elements)[i].value;
+    size_t sk= map_size(keys), sv= map_size(values);
+    if (sk < sv) sk= sv;
+    for (size_t i= 0;  i < sk;  ++i) {
+        oop key   = i < sk && map_hasIntegerKey(keys,   i) ? get(keys,   Map, elements)[i].value : makeInteger(i);
+        oop value = i < sv && map_hasIntegerKey(values, i) ? get(values, Map, elements)[i].value : null;
         map_set(map, key, value);
     }
     return map;
