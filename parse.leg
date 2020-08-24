@@ -1768,6 +1768,15 @@ oop prim_import(oop params)
     return null;
 }
 
+#include <sys/resource.h>
+
+oop prim_millis(oop params)
+{
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+    return makeInteger(ru.ru_utime.tv_sec * 1000 + ru.ru_utime.tv_usec / 1000);
+}
+
 int main(int argc, char **argv)
 {
 # if (USE_GC)
@@ -1786,6 +1795,7 @@ int main(int argc, char **argv)
     map_set(globals, intern("apply") , makeFunction(prim_apply,  intern("apply"),  null, null, globals, null));
     map_set(globals, intern("clone") , makeFunction(prim_clone,  intern("clone"),  null, null, globals, null));
     map_set(globals, intern("import"), makeFunction(prim_import, intern("import"), null, null, globals, null));
+    map_set(globals, intern("millis"), makeFunction(prim_millis, intern("millis"), null, null, globals, null));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
