@@ -1,4 +1,6 @@
-fun f() 42 f()
+fun println() { apply(print, __arguments__);  print("\n");  __arguments__; }
+
+fun f() { 42 } f()
 
 if (1) 2
 if (0) 2
@@ -6,15 +8,15 @@ if (1) 2 else 3
 if (0) 2 else 3
 
 var a = 0
-while (a < 10) print(a= a + 1)
+while (a < 10) println(a= a + 1)
 
-print(111)
+println(111)
 
-print(222)
+println(222)
 
-print(101) || print(202) || print(303)
+println(101) || println(202) || println(303)
 
-print(404) && print(505) && print(606)
+println(404) && println(505) && println(606)
 
 0b100
 0100
@@ -34,7 +36,7 @@ print(404) && print(505) && print(606)
 -0;
 ~0;
 
-fun doit(a, b) print(a < b, a <= b, a == b, a != b, a >= b, a > b)
+fun doit(a, b) { println(a < b, a <= b, a == b, a != b, a >= b, a > b) }
 
 doit(0, 0)
 doit(0, 1)
@@ -49,7 +51,7 @@ doit(2, 2)
 1 << 10
 65536 >> 8
 
-fun f(n) if (n < 2) 1 else 1 + f(n-1) + f(n-2)
+fun f(n) { if (n < 2) 1 else 1 + f(n-1) + f(n-2) }
 
 // comment
 
@@ -57,65 +59,70 @@ f(15)
 
 fun f() {
     var i = 0;
-    while (i < 10) print(i = i + 1);
+    while (i < 10) println(i = i + 1);
 }
 
 /* multi
    line
    comment */
 
+t = millis();
 var i = 0;
 while (i < 1000000) i = i + 1;
+println(millis() - t);
+exit(0);
 
-do print(i); while ((i = i + 1) < 10);
+do println(i); while ((i = i + 1) < 10);
 i= 5;
-do print(i); while ((i = i + 1) < 10);
+do println(i); while ((i = i + 1) < 10);
 
-for (var x= 100;  x < 105;  x= x + 1) print(x);
+x=null;
 
-print(x);
+for (var x= 100;  x < 105;  x= x + 1) println(x);
 
-for (i= 200;  i < 205;  i= i + 1) print(i);
+println(x);
 
-print(i);
+for (i= 200;  i < 205;  i= i + 1) println(i);
+
+println(i);
 
 switch (3) {
-   case 0: print('zero');
-   case 1: print('one');
-   case 2: print('two');
-   case 3: print('three');
-   case 4: print('four');
-   case 5: print('five');
+   case 0: println("zero");
+   case 1: println("one");
+   case 2: println("two");
+   case 3: println("three");
+   case 4: println("four");
+   case 5: println("five");
 }
 
 switch (#three) {
-   case #zero:  print(0);
-   case #one:   print(1);
-   case #two:   print(2);
-   case #three: print(3);
-   case #four:  print(4);
-   case #five:  print(5);
+   case #zero:  println(0);
+   case #one:   println(1);
+   case #two:   println(2);
+   case #three: println(3);
+   case #four:  println(4);
+   case #five:  println(5);
 }
 
 switch (#nine) {
-   case #zero:  print(0);
-   case #one:   print(1);
-   case #two:   print(2);
-   case #three: print(3);
-   case #four:  print(4);
-   case #five:  print(5);
+   case #zero:  println(0);
+   case #one:   println(1);
+   case #two:   println(2);
+   case #three: println(3);
+   case #four:  println(4);
+   case #five:  println(5);
 }
 
 switch (#nine) {
-   case #zero:  print(0);
-   case #one:   print(1);
-   case #two:   print(2);
-   case #three: print(3);
-   case #four:  print(4);
-   default:     print(666);
-   case #five:  print(5);
+   case #zero:  println(0);
+   case #one:   println(1);
+   case #two:   println(2);
+   case #three: println(3);
+   case #four:  println(4);
+   default:     println(666);
+   case #five:  println(5);
 }
 
-print('newline\nanother\012another\x0aanother\u000a')
+println("newline\nanother\012another\x0aanother\u000a")
 
-print('\nmoriturus te saluto\n') && exit(0)
+println("\nmoriturus te saluto\n") && exit(0)
