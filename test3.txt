@@ -1,7 +1,0 @@
-try {
-    print("hello")
-} catch (e) {
-    print("catch!")
-} finally {
-    print("finally...")
-}
