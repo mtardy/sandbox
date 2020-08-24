@@ -7,6 +7,6 @@ RUN wget -qO- https://www.piumarta.com/software/peg/peg-0.1.18.tar.gz | tar xz \
     && mv /peg-0.1.18/leg /usr/bin/ \
     && rm -r peg-0.1.18
 # Add project files and compile
-WORKDIR /javascrypt
+WORKDIR /sandbox
 COPY . .
 RUN make
