@@ -414,10 +414,10 @@ oop map_append(oop map, oop value)
 
 bool isHidden(oop obj) {
     if (is(Symbol, obj)) {
-	char *s = get(obj, Symbol, name);
-	size_t l = strlen(s);
-	// maybe 'l > 5' because of ____?
-	return (l > 4 && s[0] == '_' && s[1] == '_' && s[l-2] == '_' && s[l-1] == '_');
+        char *s = get(obj, Symbol, name);
+        size_t l = strlen(s);
+        // maybe 'l > 5' because of ____?
+        return (l > 4 && s[0] == '_' && s[1] == '_' && s[l-2] == '_' && s[l-1] == '_');
     }
     return false;
 }
@@ -439,7 +439,7 @@ oop map_allKeys(oop map)
     assert(is(Map, map));
     oop keys = makeMap();
     for (size_t i = 0; i < get(map, Map, size); i++) {
-	map_append(keys, get(map, Map, elements)[i].key);
+        map_append(keys, get(map, Map, elements)[i].key);
     }
     return keys;
 }
@@ -486,6 +486,42 @@ void map_print(oop map, int ident)
     return;
 }
 
+
+char *toString(oop ast)
+{
+    int length;
+    assert(ast);
+    switch (getType(ast)) {
+    case Undefined:
+        return "null";
+    case Integer:
+        //TODO
+        length = snprintf(NULL, 0, "%d", getInteger(ast));
+        printf("length is %i\n", length);
+        printf("%i", getInteger(ast));
+        return "null";
+    case String:
+        return get(ast, String, value);
+    case Symbol:
+        return get(ast, Symbol, name);
+    case Function:
+        // TODO
+        if (get(ast, Function, primitive) == NULL) {
+            printf("Function:");
+        } else {
+            printf("Primitive:");
+        }
+        print(get(ast, Function, name));
+        printf("(");
+        print(get(ast, Function, param));
+        printf(")");
+    case Map:
+        // TODO
+        map_print(ast, 0);
+    }
+    assert(0);
+}
+
 void print(oop ast)
 {
     assert(ast);
@@ -509,9 +545,9 @@ void print(oop ast)
             printf("Primitive:");
         }
         print(get(ast, Function, name));
-	printf("(");
+        printf("(");
         print(get(ast, Function, param));
-	printf(")");
+        printf(")");
         return;
     case Map:
         map_print(ast, 0);

@@ -73,8 +73,12 @@ oop globals= 0;
      DO_PROTOS() _DO(__proto__) _DO(__name__) _DO(__default__) _DO(__arguments__)                               \
     _DO(name) _DO(body) _DO(param) _DO(key) _DO(value) _DO(condition) _DO(consequent) _DO(alternate)            \
     _DO(lhs) _DO(rhs) _DO(scope) _DO(args) _DO(expression) _DO(labels) _DO(statements) _DO(initialise)          \
+<<<<<<< HEAD
     _DO(update) _DO(this) _DO(fixed) _DO(operator) _DO(map) _DO(func)                                           \
     _DO(try) _DO(catch) _DO(finally) _DO(exception)
+=======
+    _DO(update) _DO(this) _DO(fixed) _DO(operator) _DO(map) _DO(func) _DO(__line__) _DO(__file__)
+>>>>>>> master
 
 #define _DO(NAME) oop NAME##_symbol;
 DO_SYMBOLS()
@@ -85,6 +89,43 @@ DO_PROTOS()
 #undef _DO
 
 int opt_v = 0;
+
+typedef struct input_t
+{
+    oop             name;
+    FILE           *file;
+    struct input_t *next;
+    int             lineNumber;
+} input_t;
+
+input_t *inputStack= NULL;
+
+void inputStackPush(char *name) {
+    FILE *file = stdin;
+    if (NULL != name) {
+        file= fopen(name, "rb");
+        if (NULL == file) {
+            perror(name);
+            exit(1);
+        }
+    } else {
+        name= "<stdin>";
+    }
+    input_t *input = memcheck(malloc(sizeof(input_t)));
+    input->name= makeString(name);
+    input->lineNumber= 1;
+    input->file= file;
+    input->next= inputStack;
+    inputStack= input;
+    return;
+}
+
+input_t *inputStackPop(void) {
+    assert(inputStack);
+    input_t *first= inputStack;
+    inputStack= first->next;
+    return first;
+}
 
 int isFalse(oop obj)
 {
@@ -100,6 +141,9 @@ oop newObject(oop proto)
 {
     oop map = makeMap();
     map_set(map, __proto___symbol, proto);
+    // set context (file and line) for runtime error msg
+    map_set(map, __line___symbol, makeInteger(inputStack->lineNumber));
+    map_set(map, __file___symbol, inputStack->name);
     return map;
 }
 
@@ -517,43 +561,6 @@ oop newTry(oop try, oop exception, oop catch, oop finally)
 
 oop fold(oop ast);
 
-typedef struct input_t
-{
-    char           *name;
-    FILE           *file;
-    struct input_t *next;
-    int             lineNumber;
-} input_t;
-
-input_t *inputStack= NULL;
-
-void inputStackPush(char *name) {
-    FILE *file = stdin;
-    if (NULL != name) {
-        file= fopen(name, "rb");
-        if (NULL == file) {
-            perror(name);
-            exit(1);
-        }
-    } else {
-        name= "<stdin>";
-    }
-    input_t *input = memcheck(malloc(sizeof(input_t)));
-    input->name= memcheck(strdup(name));
-    input->lineNumber= 1;
-    input->file= file;
-    input->next= inputStack;
-    inputStack= input;
-    return;
-}
-
-input_t *inputStackPop(void) {
-    assert(inputStack);
-    input_t *first= inputStack;
-    inputStack= first->next;
-    return first;
-}
-
 #define YY_INPUT(buf, result, max_size)        \
 {                                              \
 int yyc= getc(inputStack->file);               \
@@ -566,9 +573,9 @@ YYSTYPE yylval;
 
 int errorLine= 1;
 
-void error(char *text)
+void syntaxError(char *text)
 {
-    fprintf(stderr, "\nSyntax error in %s near line %i:\n%s\n", inputStack->name, errorLine, text);
+    fprintf(stderr, "\nSyntax error in %s near line %i:\n%s\n", get(inputStack->name, String, value), errorLine, text);
     exit(1);
 }
 
@@ -587,7 +594,7 @@ start   = - ( IMPORT s:STRING                                { yylval = null; in
             )
 
 error   =                                                    { errorLine= inputStack->lineNumber }
-            eol* < (!eol .)* eol* (!eol .)* >                { error(yytext) }
+            eol* < (!eol .)* eol* (!eol .)* >                { syntaxError(yytext) }
 
 stmt    =   e:exp SEMICOLON*                                 { $$ = e }
         |   s:block                                          { $$ = s }
@@ -696,8 +703,8 @@ shift   =   l:sum
             )*                          { $$ = l }
 
 sum     =   l:prod
-            ( PLUS  r:prod              { l = newBinary(Add_proto, l, r) }
-            | MINUS r:prod              { l = newBinary(Sub_proto, l, r) }
+            ( PLUS  r:prod            { l = newBinary(Add_proto, l, r) }
+            | MINUS r:prod            { l = newBinary(Sub_proto, l, r) }
             )*                          { $$ = l }
 
 prod    =   l:prefix
@@ -906,19 +913,26 @@ oop clone(oop obj)
     return obj;
 }
 
-oop addOperation(oop lhs, oop rhs)
+void runtimeError(oop ast, char *msg)
+{
+    char *fileName= get(map_get(ast, __file___symbol), String, value);
+    fprintf(stderr, "\nRuntime error in %s near line %i:\nError: %s\n", fileName, getInteger(map_get(ast, __line___symbol)), msg);
+    exit(1);
+}
+
+oop addOperation(oop ast, oop lhs, oop rhs)
 {
     if (getType(lhs) == Integer && getType(rhs) == Integer) {
         return makeInteger(getInteger(lhs) + getInteger(rhs));
     } else if (getType(lhs) == String && getType(rhs) == String) {
         return string_concat(lhs, rhs);
     } else {
-        fprintf(stderr, "\naddition between two incompatible types\n");
-        exit(1);
+        runtimeError(ast, "addition between two incompatible types");
+        assert(0); // to prevent: control may reach end of non-void function
     }
 }
 
-oop mulOperation(oop lhs, oop rhs)
+oop mulOperation(oop ast, oop lhs, oop rhs)
 {
     if (getType(lhs) == Integer && getType(rhs) == Integer) {
         return makeInteger(getInteger(lhs) * getInteger(rhs));
@@ -927,8 +941,8 @@ oop mulOperation(oop lhs, oop rhs)
     } else if (getType(lhs) == Integer && getType(rhs) == String) {
         return string_mul(rhs, lhs);
     } else {
-        fprintf(stderr, "\nmultiplication between two incompatible types\n");
-        exit(1);
+        runtimeError(ast, "multiplication between two incompatible types");
+        assert(0);
     }
 }
 
@@ -1019,13 +1033,13 @@ oop fold(oop ast)
     return null;
 }
 
-oop applyOperator(oop op, oop lhs, oop rhs)
+oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
 {
     if (null != op) {                                                           assert(is(Symbol, op));
     switch (get(op, Symbol, prototype)) {
-        case t_Add:     return addOperation(lhs, rhs);
+        case t_Add:     return addOperation(ast, lhs, rhs);
         case t_Sub:     return makeInteger(getInteger(lhs)  - getInteger(rhs));
-        case t_Mul:     return makeInteger(getInteger(lhs)  * getInteger(rhs));
+        case t_Mul:     return mulOperation(ast, lhs, rhs);
         case t_Div:     return makeInteger(getInteger(lhs)  / getInteger(rhs));
         case t_Mod:     return makeInteger(getInteger(lhs)  % getInteger(rhs));
         case t_Bitor:   return makeInteger(getInteger(lhs)  | getInteger(rhs));
@@ -1089,8 +1103,7 @@ oop eval(oop scope, oop ast)
         return expandUnquotes(scope, obj);
     }
     case t_Unquote: {
-        fprintf(stderr, "\n@ outside of `\n");
-        exit(1);
+        runtimeError(ast, "@ outside of `");
     }
     case t_Declaration: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -1248,7 +1261,7 @@ oop eval(oop scope, oop ast)
         oop lhs = map_get(ast, lhs_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        if (null != op) rhs= applyOperator(op, getVariable(scope, lhs), rhs);
+        if (null != op) rhs= applyOperator(ast, op, getVariable(scope, lhs), rhs);
         setVariable(scope, lhs, rhs);
         if (is(Function, rhs) && null == get(rhs, Function, name)) {
             set(rhs, Function, name, lhs);
@@ -1273,6 +1286,8 @@ oop eval(oop scope, oop ast)
     case t_Call: {
         oop func = eval(scope, map_get(ast, func_symbol));
         if (!is(Function, func)) {
+            // TODO better error printing
+            // Please search for ISSUE1 in parse.leg
             printf("cannot call ");
             println(func);
             exit(1);
@@ -1303,12 +1318,10 @@ oop eval(oop scope, oop ast)
                     return result;
                 }
                 case j_break: {
-                    fprintf(stderr, "\nbreak outside of a loop\n");
-                    exit(1);
+                    runtimeError(ast, "break outside of a loop");
                 }
                 case j_continue: {
-                    fprintf(stderr, "\ncontinue outside of a loop\n");
-                    exit(1);
+                    runtimeError(ast, "continue outside of a loop");
                 }
                 case j_throw: {
                     oop res= jbs->result;
@@ -1360,12 +1373,10 @@ oop eval(oop scope, oop ast)
                 return result;
             }
             case j_break: {
-                fprintf(stderr, "\nbreak outside of a loop\n");
-                exit(1);
+                runtimeError(ast, "break outside of a loop");
             }
             case j_continue: {
-                fprintf(stderr, "\ncontinue outside of a loop\n");
-                exit(1);
+                runtimeError(ast, "continue outside of a loop");
             }
             case j_throw: {
                 oop res= jbs->result;
@@ -1457,7 +1468,7 @@ oop eval(oop scope, oop ast)
         oop key = map_get(ast, key_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
-        if (null != op) value= applyOperator(op, getMember(map, key), value);
+        if (null != op) value= applyOperator(ast, op, getMember(map, key), value);
         if (is(Function, value) && null == get(value, Function, name)) {
             set(value, Function, name, key);
         }
@@ -1469,16 +1480,13 @@ oop eval(oop scope, oop ast)
         switch (getType(map)) {
             case String:
                 if (getInteger(key) >= get(map, String, size)) {
-                    fprintf(stderr, "\nGetIndex out of range on String\n");
-                    exit(1);
+                    runtimeError(ast, "GetIndex out of range on String");
                 }
                 return makeInteger(unescape(get(map, String, value))[getInteger(key)]);
             case Map:
                 return map_get(map, key);
             default:
-                // should it returns null instead?
-                fprintf(stderr, "\nGetIndex on non Map or String\n");
-                exit(1);
+                runtimeError(ast, "GetIndex on non Map or String");
         }
     }
     case t_SetIndex: {
@@ -1489,18 +1497,15 @@ oop eval(oop scope, oop ast)
         switch (getType(map)) {
             case String:
                 if (getInteger(key) >= get(map, String, size)) {
-                    fprintf(stderr, "\nSetIndex out of range on String\n");
-                    exit(1);
+                    runtimeError(ast, "SetIndex out of range on String");
                 }
                 get(map, String, value)[getInteger(key)] = getInteger(value);
                 return value;
             case Map:
-                if (null != op) value= applyOperator(op, map_get(map, key), value);
+                if (null != op) value= applyOperator(ast, op, map_get(map, key), value);
                 return map_set(map, key, value);
             default:
-                // should it returns null instead?
-                fprintf(stderr, "\nSetIndex on non Map or String\n");
-                exit(1);
+                runtimeError(ast, "SetIndex on non Map or String");
         }
 
     }
@@ -1544,14 +1549,14 @@ oop eval(oop scope, oop ast)
     case t_Add: {
         oop lhs = eval(scope, map_get(ast, lhs_symbol));
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        return addOperation(lhs, rhs);
+        return addOperation(ast, lhs, rhs);
     }
     BINARY(Sub,       - );
 //  BINARY(Mul,       * );
     case t_Mul: {
         oop lhs = eval(scope, map_get(ast, lhs_symbol));
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        return mulOperation(lhs, rhs);
+        return mulOperation(ast, lhs, rhs);
     }
     BINARY(Div,       / );
     BINARY(Mod,       % );
@@ -1703,6 +1708,14 @@ oop prim_length(oop params)
     return null;
 }
 
+// TODO
+// ISSUE1: how can I handle the "cannot invoke " with nice printing the func name and its args
+// it would be really nice to have a toString() function (that would be directly used in print())
+// but it seems that it's really complicated to write a toString() for integer, function and maps...
+// please see the draft line 490 in object.c
+
+// ISSUE2: how can I tackle the 2 fprintf(stderr, "\nbreak/continue oustide of a loop\n") in prim_invoke and prim_apply
+// in this situation it seems that I don't have access to any AST
 oop prim_invoke(oop params)
 {
     oop this= null;      if (map_hasIntegerKey(params, 0)) this=  get(params, Map, elements)[0].value;
