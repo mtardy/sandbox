@@ -1,0 +1,18 @@
+try {
+    try {
+        println("hello")
+        throw "ERROR 12";
+        println("that should not be executed");
+    } catch (e) {
+        println("catch!")
+        println("inner: ", e)
+        throw "pizza"
+        print("after pizza")
+    } finally {
+        println("finally...")
+        throw "oh no"
+        println("after oh no")
+    }
+} catch (e) {
+    println("outer: ", e);
+}
