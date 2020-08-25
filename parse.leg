@@ -85,7 +85,8 @@ DO_SYMBOLS()
 DO_PROTOS()
 #undef _DO
 
-int opt_v = 0;
+int opt_v= 0;
+oop mrAST= null;
 
 typedef struct input_t
 {
@@ -910,10 +911,10 @@ oop clone(oop obj)
     return obj;
 }
 
-void runtimeError(oop ast, char *msg)
+void runtimeError(char *msg)
 {
-    char *fileName= get(map_get(ast, __file___symbol), String, value);
-    fprintf(stderr, "\nRuntime error in %s near line %i:\nError: %s\n", fileName, getInteger(map_get(ast, __line___symbol)), msg);
+    char *fileName= get(map_get(mrAST, __file___symbol), String, value);
+    fprintf(stderr, "\nRuntime error in %s near line %i:\nError: %s\n", fileName, getInteger(map_get(mrAST, __line___symbol)), msg);
     exit(1);
 }
 
@@ -924,7 +925,7 @@ oop addOperation(oop ast, oop lhs, oop rhs)
     } else if (getType(lhs) == String && getType(rhs) == String) {
         return string_concat(lhs, rhs);
     } else {
-        runtimeError(ast, "addition between two incompatible types");
+        runtimeError("addition between two incompatible types");
         assert(0); // to prevent: control may reach end of non-void function
     }
 }
@@ -938,7 +939,7 @@ oop mulOperation(oop ast, oop lhs, oop rhs)
     } else if (getType(lhs) == Integer && getType(rhs) == String) {
         return string_mul(rhs, lhs);
     } else {
-        runtimeError(ast, "multiplication between two incompatible types");
+        runtimeError("multiplication between two incompatible types");
         assert(0);
     }
 }
@@ -1076,6 +1077,8 @@ oop eval(oop scope, oop ast)
 
     assert(is(Map, ast));
 
+    mrAST= ast;
+
     oop proto = map_get(ast, __proto___symbol);
     if (proto == null) {
         return ast;
@@ -1100,7 +1103,7 @@ oop eval(oop scope, oop ast)
         return expandUnquotes(scope, obj);
     }
     case t_Unquote: {
-        runtimeError(ast, "@ outside of `");
+        runtimeError("@ outside of `");
     }
     case t_Declaration: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -1315,10 +1318,10 @@ oop eval(oop scope, oop ast)
                     return result;
                 }
                 case j_break: {
-                    runtimeError(ast, "break outside of a loop");
+                    runtimeError("break outside of a loop");
                 }
                 case j_continue: {
-                    runtimeError(ast, "continue outside of a loop");
+                    runtimeError("continue outside of a loop");
                 }
                 case j_throw: {
                     oop res= jbs->result;
@@ -1370,10 +1373,10 @@ oop eval(oop scope, oop ast)
                 return result;
             }
             case j_break: {
-                runtimeError(ast, "break outside of a loop");
+                runtimeError("break outside of a loop");
             }
             case j_continue: {
-                runtimeError(ast, "continue outside of a loop");
+                runtimeError("continue outside of a loop");
             }
             case j_throw: {
                 oop res= jbs->result;
@@ -1414,53 +1417,40 @@ oop eval(oop scope, oop ast)
 
         jbRecPush();
         int jbt = sigsetjmp(jbs->jb, 0);
-        switch (jbt) {
-            case j_return: {
-                runtimeError(ast, "return outside of a function");
-            }
-            case j_break: {
-                runtimeError(ast, "break outside of a loop or switch");
-            }
-            case j_continue: {
-                runtimeError(ast, "continue outside of a loop");
-            }
-            case j_throw: {
-                oop e= jbs->result;
-                jbRecPop();
-                jbs->result= e;
-                // that should only be set in the catch local scope
-                setVariable(scope, exception, e);
-                jbRecPush();
-                jbt = sigsetjmp(jbs->jb, 0);
-                switch (jbt) {
-                    case j_return: {
-                        runtimeError(ast, "return outside of a function");
-                    }
-                    case j_break: {
-                        runtimeError(ast, "break outside of a loop or switch");
-                    }
-                    case j_continue: {
-                        runtimeError(ast, "continue outside of a loop");
-                    }
-                    case j_throw: {
-                        // transfer exception
-                        oop e= jbs->result;
-                        jbRecPop();
-                        jbs->result= e;
-
-                        eval(scope, finally);
-                        siglongjmp(jbs->jb, j_throw);
-                    }
-                }
-                oop catchRes= eval(scope, catch);
-                eval(scope, finally);
-                jbRecPop();
-                return catchRes;
-            }
+        if (0 == jbt) {
+            oop res = eval(scope, try);
+            jbRecPop();
+            eval(scope, finally);
+            return res;
         }
-        oop res = eval(scope, try);
+        oop res= jbs->result;
         jbRecPop();
-        return res;
+        // something happend in the try block
+        if (j_throw == jbt) {
+            assert(jbs);
+            jbs->result= res;
+
+            if (null == catch) {
+                return eval(scope, finally);
+            }
+            oop localScope= newObject(scope);
+            setVariable(localScope, exception, res);
+
+            jbRecPush();
+            jbt= sigsetjmp(jbs->jb, 0);
+            if (0 == jbt) {
+                eval(localScope, catch);
+                jbRecPop();
+                return eval(scope, finally);
+            }
+            // something happend in the catch block
+            res= jbs->result;
+            jbRecPop();
+        }
+        eval(scope, finally);
+        assert(jbs);
+        jbs->result= res;
+        siglongjmp(jbs->jb, jbt);
     }
     case t_Block: {
         oop statements = map_get(ast, statements_symbol);
@@ -1500,13 +1490,13 @@ oop eval(oop scope, oop ast)
         switch (getType(map)) {
             case String:
                 if (getInteger(key) >= get(map, String, size)) {
-                    runtimeError(ast, "GetIndex out of range on String");
+                    runtimeError("GetIndex out of range on String");
                 }
                 return makeInteger(unescape(get(map, String, value))[getInteger(key)]);
             case Map:
                 return map_get(map, key);
             default:
-                runtimeError(ast, "GetIndex on non Map or String");
+                runtimeError("GetIndex on non Map or String");
         }
     }
     case t_SetIndex: {
@@ -1517,7 +1507,7 @@ oop eval(oop scope, oop ast)
         switch (getType(map)) {
             case String:
                 if (getInteger(key) >= get(map, String, size)) {
-                    runtimeError(ast, "SetIndex out of range on String");
+                    runtimeError("SetIndex out of range on String");
                 }
                 get(map, String, value)[getInteger(key)] = getInteger(value);
                 return value;
@@ -1525,7 +1515,7 @@ oop eval(oop scope, oop ast)
                 if (null != op) value= applyOperator(ast, op, map_get(map, key), value);
                 return map_set(map, key, value);
             default:
-                runtimeError(ast, "SetIndex on non Map or String");
+                runtimeError("SetIndex on non Map or String");
         }
 
     }
@@ -1763,12 +1753,10 @@ oop prim_invoke(oop params)
             return result;
         }
         case j_break: {
-            fprintf(stderr, "\nbreak outside of a loop\n");
-            exit(1);
+            runtimeError("break outside of a loop or switch");
         }
         case j_continue: {
-            fprintf(stderr, "\ncontinue outside of a loop\n");
-            exit(1);
+            runtimeError("continue oustide of a loop");
         }
         case j_throw: {
             oop res= jbs->result;
@@ -1805,12 +1793,10 @@ oop apply(oop func, oop args)
             return result;
         }
         case j_break: {
-            fprintf(stderr, "\nbreak outside of a loop\n");
-            exit(1);
+            runtimeError("break outside of a loop or switch");
         }
         case j_continue: {
-            fprintf(stderr, "\ncontinue outside of a loop\n");
-            exit(1);
+            runtimeError("continue outside of a loop");
         }
         case j_throw: {
             oop res= jbs->result;
@@ -1894,14 +1880,11 @@ void readEvalPrint(char *fileName) {
     jbRecPop();
     switch (jbt) {
         case j_return:
-            fprintf(stderr, "\nreturn outside of a function\n");
-            exit(1);
+            runtimeError("return outside of a function");
         case j_break:
-            fprintf(stderr, "\nbreak outside of a loop or switch\n");
-            exit(1);
+            runtimeError("break outside of a loop or switch");
         case j_continue:
-            fprintf(stderr, "\ncontinue outside of a loop\n");
-            exit(1);
+            runtimeError("continue outside of a loop");
         case j_throw:
             printf("\nunhandled exception: ");
             println(res);

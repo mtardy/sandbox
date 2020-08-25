@@ -122,7 +122,7 @@ union object {
 };
 
 union object _null = {.Undefined = {Undefined}};
-oop null = &_null;
+const oop null = &_null;
 
 int is(type_t type, oop obj);
 

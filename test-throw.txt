@@ -1,0 +1,237 @@
+fun println() {
+    apply(print, __arguments__);
+    print("\n");
+    __arguments__;
+}
+
+fun ok() {
+    println("OK!");
+}
+
+fun ko() {
+    println("KO!");
+    throw "this is ko'd";
+    println("CANNOT HAPPEN");
+}
+
+println("----------------A");
+
+try {
+    println(ok());
+}
+
+println("----------------B");
+
+try {
+    println(ko());
+}
+
+println("----------------C");
+
+try {
+    println(ko());
+}
+finally {
+    println("CLEANUP 1");
+}
+
+println("----------------D");
+
+try {
+    println(ko());
+}
+catch (e) {
+    println("CAUGHT ", e);
+}
+
+println("----------------E");
+
+try {
+    println(ko());
+}
+catch (e) {
+    println("CAUGHT ", e);
+}
+finally {
+    println("CLEANUP 2");
+}
+
+println("----------------F");
+
+try {
+try {
+    println(ko());
+}
+catch (e) {
+    println("CAUGHT ", e);
+    throw "throwing in catch"
+}
+finally {
+    println("CLEANUP 3");
+}
+} catch (e) println(e);
+
+println("----------------G");
+
+try {
+    try {
+        println(ko());
+    }
+    catch (e) {
+        println("CAUGHT ", e);
+    }
+    finally {
+        println("CLEANUP 4");
+        throw "throwing in finally"
+    }
+} catch (e) println(e);
+
+println("----------------H");
+
+try {
+    try {
+        println(ko());
+    }
+    catch (e) {
+        println("RETHROW ", e);
+	throw e;
+    }
+    finally {
+        println("CLEANUP 5");
+    }
+}
+catch (e) {
+    println("CAUGHT ", e);
+}
+
+println("----------------I");
+
+try {
+    try {
+        try {
+            try {
+                try {
+		    try {
+		        println(ko());
+		    }
+		    catch (e) {
+        	        println("RETHROW 6 ", e);
+			throw e;
+    		    }
+    		    finally {
+        	        println("CLEANUP 6");
+    		    }
+		}
+		catch (e) {
+        	    println("RETHROW 7 ", e);
+		    throw e;
+    		}
+    		finally {
+        	    println("CLEANUP 7");
+    		}
+            }
+            catch (e) {
+                    println("CAUGHT 8")
+            }
+    	    finally {
+        	println("CLEANUP 8");
+    	    }
+        }
+        finally {
+           	println("CLEANUP 9");
+    	}
+    }
+    finally {
+       	println("CLEANUP 10");
+    }
+}
+catch (e) {
+    println("CAUGHT 11 ", e);
+}
+finally {
+    println("CLEANUP 11");
+}
+
+println("----------------J");
+
+t=millis();
+
+sum= 0;
+for (a= 0;  a < 100000;  a++) {
+    sum += a;
+}
+
+println(sum, " loop: ", millis()-t);
+
+t=millis();
+
+sum= 0;
+for (a= 0;  a < 100000;  a++) {
+    sum += a;
+    continue;
+}
+
+println(sum, " continue: ", millis()-t);
+
+println("----------------K");
+
+t=millis();
+
+sum= 0;
+for (a= 0;  a < 100000;  a++) {
+    try {
+        try {
+            try {
+                try {
+                    try {
+                        try {
+                            try {
+                                try {
+                                    try {
+                                        try {
+					    sum += a;
+			                    // throw "oops";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+println(sum, " tries: ", millis()-t);
+
+t=millis();
+
+sum= 0;
+for (a= 0;  a < 100000;  a++) {
+    try {
+        try {
+            try {
+                try {
+                    try {
+                        try {
+                            try {
+                                try {
+                                    try {
+                                        try {
+					    sum += a;
+			                    throw "oops";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch (e) {}
+}
+
+println(sum, " throws: ", millis()-t);

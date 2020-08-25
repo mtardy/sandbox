@@ -1,18 +1,17 @@
-try {
+for(i=0; i<10; ++i) {
     try {
-        println("hello")
-        throw "ERROR 12";
-        println("that should not be executed");
+        throw i
     } catch (e) {
-        println("catch!")
-        println("inner: ", e)
-        throw "pizza"
-        print("after pizza")
+        if (e == 5) {
+            continue;
+        }
+        println(e)
+        if (e == 8) {
+            break;
+        }
     } finally {
-        println("finally...")
-        throw "oh no"
-        println("after oh no")
+        if (i == 3) {
+            return;
+        }
     }
-} catch (e) {
-    println("outer: ", e);
 }

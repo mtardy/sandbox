@@ -1,6 +1,5 @@
 2;
 12;
-(3*null);
 a = {}
-a.piz = fun f() {continue;}
-`invoke(a, (a.piz), {})
+a.piz = fun f() {break;}
+invoke(a, (a.piz), {})
