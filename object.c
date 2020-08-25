@@ -87,7 +87,6 @@ struct Symbol {
 
 typedef oop (*primitive_t)(oop params);
 
-
 struct Function {
     type_t type;
     primitive_t primitive;
@@ -173,9 +172,12 @@ void *memcheck(void *ptr)
     return ptr;
 }
 
+#include "buffer.h"
+DECLARE_STRING_BUFFER(char, StringBuffer);
+
 void print(oop ast);
 void println(oop ast);
-
+void printOn(StringBuffer *buf, oop obj);
 
 int getInteger(oop obj)
 {
@@ -456,104 +458,93 @@ oop map_values(oop map)
     return values;
 }
 
-void map_print(oop map, int ident)
+void map_printOn(StringBuffer *buf, oop map, int ident)
 {
     assert(is(Map, map));
     if (ident == 0) {
-        printf("{");
-        map_print(map, ident + 1);
-        printf("}");
+        StringBuffer_append(buf, '{');
+        map_printOn(buf, map, ident + 1);
+        StringBuffer_append(buf, '}');
         return;
     }
     for (size_t i = 0; i < map_size(map); i++) {
-        printf("\n");
+        StringBuffer_append(buf, '\n');
         for (size_t i = 0; i < ident; i++) {
-            printf("|");
-            printf("   ");
+            if (isatty(fileno(stdout))) {
+                StringBuffer_appendString(buf, "\033[90m|\033[0m");
+            } else {
+                StringBuffer_appendString(buf, "|");
+            }
+            StringBuffer_appendString(buf, "   ");
         }
         // todo: a key could be a map itself
-        print(get(map, Map, elements)[i].key);
-        printf(": ");
+        printOn(buf, get(map, Map, elements)[i].key);
+        StringBuffer_appendString(buf, ": ");
         oop rhs = get(map, Map, elements)[i].value;
         if (getType(rhs) == Map) {
-            map_print(rhs, ident + 1);
+            map_printOn(buf, rhs, ident + 1);
         } else {
-            print(rhs);
+            printOn(buf, rhs);
         }
-        if (i < map_size(map) - 1) printf(",");
-        if (ident == 1 && i == map_size(map) - 1) printf("\n");
+        if (i < map_size(map) - 1) StringBuffer_append(buf, ',');
+        if (ident == 1 && i == map_size(map) - 1) StringBuffer_append(buf, '\n');
     }
-    return;
 }
 
-
-char *toString(oop ast)
+void printOn(StringBuffer *buf, oop obj)
 {
-    int length;
-    assert(ast);
-    switch (getType(ast)) {
-    case Undefined:
-        return "null";
-    case Integer:
-        //TODO
-        length = snprintf(NULL, 0, "%d", getInteger(ast));
-        printf("length is %i\n", length);
-        printf("%i", getInteger(ast));
-        return "null";
-    case String:
-        return get(ast, String, value);
-    case Symbol:
-        return get(ast, Symbol, name);
-    case Function:
-        // TODO
-        if (get(ast, Function, primitive) == NULL) {
-            printf("Function:");
-        } else {
-            printf("Primitive:");
+    assert(obj);
+    switch (getType(obj)) {
+        case Undefined: {
+            StringBuffer_appendString(buf, "null");
+            return;
         }
-        print(get(ast, Function, name));
-        printf("(");
-        print(get(ast, Function, param));
-        printf(")");
-    case Map:
-        // TODO
-        map_print(ast, 0);
+        case Integer: {
+            char tmp[32];
+            int length = snprintf(tmp, sizeof(tmp), "%i", getInteger(obj));
+            StringBuffer_appendAll(buf, tmp, length);
+            return;
+        }
+        case String: {
+            StringBuffer_appendAll(buf, get(obj, String, value), string_size(obj));
+            return;
+        }
+        case Symbol: {
+            char *name= get(obj, Symbol, name);
+            StringBuffer_appendString(buf, name);
+            return;
+        }
+        case Function: {
+            if (get(obj, Function, primitive) == NULL) {
+                StringBuffer_appendString(buf, "Function:");
+            } else {
+                StringBuffer_appendString(buf, "Primitive:");
+            }
+            printOn(buf, get(obj, Function, name));
+            StringBuffer_append(buf, '(');
+            printOn(buf, get(obj, Function, param));
+            StringBuffer_append(buf, ')');
+            return;
+        }
+        case Map: {
+            map_printOn(buf, obj, 0);
+            return;
+        }
     }
     assert(0);
 }
 
-void print(oop ast)
+char *printString(oop obj)
 {
-    assert(ast);
-    switch (getType(ast)) {
-    case Undefined:
-        printf("null");
-        return;
-    case Integer:
-        printf("%i", getInteger(ast));
-        return;
-    case String:
-        printf("%s", get(ast, String, value));
-        return;
-    case Symbol:
-        printf("%s", get(ast, Symbol, name));
-        return;
-    case Function:
-        if (get(ast, Function, primitive) == NULL) {
-            printf("Function:");
-        } else {
-            printf("Primitive:");
-        }
-        print(get(ast, Function, name));
-        printf("(");
-        print(get(ast, Function, param));
-        printf(")");
-        return;
-    case Map:
-        map_print(ast, 0);
-        return;
-    }
-    assert(0);
+    static StringBuffer buf= BUFFER_INITIALISER;
+    StringBuffer_clear(&buf);
+    printOn(&buf, obj);
+    return StringBuffer_contents(&buf);
+}
+
+void print(oop obj)
+{
+    fputs(printString(obj), stdout);
 }
 
 void println(oop ast)

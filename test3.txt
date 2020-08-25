@@ -1,0 +1,3 @@
+println(666)
+import "test-proto.txt"
+println(12)

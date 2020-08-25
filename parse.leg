@@ -86,7 +86,7 @@ DO_PROTOS()
 #undef _DO
 
 int opt_v= 0;
-oop mrAST= null;
+oop mrAST= &_null;
 
 typedef struct input_t
 {
@@ -1852,18 +1852,22 @@ oop evalArgs(oop scope, oop args)
 
 oop AST= NULL;
 
-void readEvalPrint(char *fileName) {
+void readEvalPrint(char *fileName)
+{
     inputStackPush(fileName);
+    input_t *top= inputStack;
     jbRecPush();
     jb_record *jtop= jbs;
     int jbt= sigsetjmp(jbs->jb, 0);
 
     if (0 == jbt) {
-        while (inputStack && yyparse()) {
+        while (yyparse()) {
             if (opt_v > 1) printf("%s:%i: ", get(inputStack->name, String, value), inputStack->lineNumber);
             if (!yylval) {
                 fclose(inputStack->file);
+                if (top == inputStack) break;
                 inputStackPop();
+                assert(inputStack);
                 continue;
             }             // EOF
             if (opt_v > 1) println(yylval);
@@ -1871,6 +1875,8 @@ void readEvalPrint(char *fileName) {
             if (opt_v > 0) println(res);
             assert(jbs == jtop);
         }
+        assert(inputStack);
+        inputStackPop();
         jbRecPop();
         return;
     }
