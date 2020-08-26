@@ -911,10 +911,77 @@ oop clone(oop obj)
     return obj;
 }
 
+struct Call
+{
+    oop ast, function;
+};
+
+DECLARE_BUFFER(struct Call, CallArray);
+
+CallArray backtrace= BUFFER_INITIALISER;
+
+struct Call CallArray_pop(CallArray *oa)
+{                                                                                       assert(oa->position > 0);
+    return oa->contents[--oa->position];
+}
+
+void trace(oop ast, oop func)
+{
+    CallArray_append(&backtrace, (struct Call){ ast, func });
+}
+
+void untrace(oop ast)
+{
+    struct Call top= CallArray_pop(&backtrace);							assert(top.ast == ast);
+}
+
+void printLocation(oop ast)
+{
+    fflush(stdout);
+    if (!is(Map, ast)) return;
+    char *fileName   = get       (map_get(ast, __file___symbol), String, value);
+    int   lineNumber = getInteger(map_get(ast, __line___symbol)               );
+    fprintf(stderr, "%s:%i", fileName, lineNumber);
+}
+
+void printlnLocation(oop ast)
+{
+    fflush(stdout);
+    if (!is(Map, ast)) return;
+    printLocation(ast);
+    fprintf(stderr, "\n");
+}
+
+void printBacktrace(oop top)
+{
+    fflush(stdout);
+    printLocation(top);
+    while (CallArray_position(&backtrace) > 0) {
+    struct Call call= CallArray_pop(&backtrace);
+    if (is(Map, call.ast) && Call_proto == map_get(call.ast, __proto___symbol)) {
+        oop name= get(call.function, Function, name);
+        if (null != name) {
+        printf(" in ");
+        if (get(call.function, Function, primitive))
+            printf("primitive ");
+        else
+            printf("function ");
+        println(get(call.function, Function, name));
+        }
+    }
+    else {
+        printf("\n");
+    }
+    printLocation(call.ast);
+    }
+    printf("\n");
+}
+
 void runtimeError(char *msg)
 {
-    char *fileName= get(map_get(mrAST, __file___symbol), String, value);
-    fprintf(stderr, "\nRuntime error in %s near line %i:\nError: %s\n", fileName, getInteger(map_get(mrAST, __line___symbol)), msg);
+    fflush(stdout);
+    fprintf(stderr, "\n%s\n", msg);
+    printBacktrace(mrAST);
     exit(1);
 }
 
@@ -1310,9 +1377,11 @@ oop eval(oop scope, oop ast)
             }
 
             jbRecPush();
+            trace(ast, func);
             int jbt = sigsetjmp(jbs->jb, 0);
             switch (jbt) {
                 case j_return: {
+                    untrace(ast);
                     oop result = jbs->result;
                     jbRecPop();
                     return result;
@@ -1324,6 +1393,7 @@ oop eval(oop scope, oop ast)
                     runtimeError("continue outside of a loop");
                 }
                 case j_throw: {
+                    untrace(ast);
                     oop res= jbs->result;
                     jbRecPop();
                     jbs->result= res;
@@ -1332,6 +1402,7 @@ oop eval(oop scope, oop ast)
             }
 
             oop result = eval(localScope, get(func, Function, body));
+            untrace(ast);
             jbRecPop();
             return result;
         }
@@ -1547,8 +1618,16 @@ oop eval(oop scope, oop ast)
     BINARY(Bitor,     | );
     BINARY(Bitxor,    ^ );
     BINARY(Bitand,    & );
-    BINARY(Equal,     ==);
-    BINARY(Noteq,     !=);
+    case t_Equal: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return makeInteger(0 == oopcmp(lhs, rhs));
+    }
+    case t_Noteq: {
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));
+        return makeInteger(0 != oopcmp(lhs, rhs));
+    }
     BINARY(Less,      < );
     BINARY(Lesseq,    <=);
     BINARY(Greatereq, >=);
@@ -1894,6 +1973,7 @@ void readEvalPrint(char *fileName)
         case j_throw:
             printf("\nunhandled exception: ");
             println(res);
+            printBacktrace(mrAST);
             exit(1);
     }
 }
