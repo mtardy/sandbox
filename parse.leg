@@ -1618,11 +1618,6 @@ oop eval(oop scope, oop ast)
     BINARY(Bitor,     | );
     BINARY(Bitxor,    ^ );
     BINARY(Bitand,    & );
-<<<<<<< HEAD
-=======
-//  BINARY(Equal,     ==);
-//  BINARY(Noteq,     !=);
->>>>>>> master
     case t_Equal: {
         oop lhs = eval(scope, map_get(ast, lhs_symbol));
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
