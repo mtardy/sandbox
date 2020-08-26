@@ -1,0 +1,6 @@
+var pi = 3
+
+fun sum(a, b) {
+    return a+b;
+}
+println("Hello from test-module.txt");

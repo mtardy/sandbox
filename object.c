@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <sysexits.h>
 #include <assert.h>
 
@@ -85,7 +86,7 @@ struct Symbol {
     #endif //SYMBOL_PAYLOAD
 };
 
-typedef oop (*primitive_t)(oop params);
+typedef oop (*primitive_t)(oop scope, oop params);
 
 struct Function {
     type_t type;
@@ -177,7 +178,7 @@ DECLARE_STRING_BUFFER(char, StringBuffer);
 
 void print(oop ast);
 void println(oop ast);
-void printOn(StringBuffer *buf, oop obj);
+void printOn(StringBuffer *buf, oop obj, int indent);
 
 int getInteger(oop obj)
 {
@@ -458,6 +459,40 @@ oop map_values(oop map)
     return values;
 }
 
+DECLARE_BUFFER(oop, OopStack);
+OopStack printing = BUFFER_INITIALISER;
+
+#define OopStack_push(s, o) OopStack_append(s, o)
+oop OopStack_pop(OopStack *s)
+{
+    if (s->position < 1) {
+        return null;
+    }
+    return s->contents[--(s->position)];
+}
+
+int OopStack_includes(OopStack *s, oop map)
+{
+    for (size_t i=0;  i < s->position;  ++i) {
+        if (s->contents[i] == map) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void indentOn(StringBuffer *buf, int indent)
+{
+    for (size_t i = 0; i < indent; i++) {
+        if (isatty(fileno(stdout))) {
+            StringBuffer_appendString(buf, "\033[90m|\033[0m");
+        } else {
+            StringBuffer_appendString(buf, "|");
+        }
+        StringBuffer_appendString(buf, "   ");
+    }
+}
+
 void map_printOn(StringBuffer *buf, oop map, int ident)
 {
     assert(is(Map, map));
@@ -467,31 +502,30 @@ void map_printOn(StringBuffer *buf, oop map, int ident)
         StringBuffer_append(buf, '}');
         return;
     }
+    if (OopStack_includes(&printing, map)) {
+        StringBuffer_appendString(buf, "<cycle>");
+        return;
+    }
+    OopStack_push(&printing, map);
     for (size_t i = 0; i < map_size(map); i++) {
         StringBuffer_append(buf, '\n');
-        for (size_t i = 0; i < ident; i++) {
-            if (isatty(fileno(stdout))) {
-                StringBuffer_appendString(buf, "\033[90m|\033[0m");
-            } else {
-                StringBuffer_appendString(buf, "|");
-            }
-            StringBuffer_appendString(buf, "   ");
-        }
+        indentOn(buf, ident);
         // todo: a key could be a map itself
-        printOn(buf, get(map, Map, elements)[i].key);
+        printOn(buf, get(map, Map, elements)[i].key, ident);
         StringBuffer_appendString(buf, ": ");
         oop rhs = get(map, Map, elements)[i].value;
         if (getType(rhs) == Map) {
             map_printOn(buf, rhs, ident + 1);
         } else {
-            printOn(buf, rhs);
+            printOn(buf, rhs, ident);
         }
         if (i < map_size(map) - 1) StringBuffer_append(buf, ',');
         if (ident == 1 && i == map_size(map) - 1) StringBuffer_append(buf, '\n');
     }
+    OopStack_pop(&printing);
 }
 
-void printOn(StringBuffer *buf, oop obj)
+void printOn(StringBuffer *buf, oop obj, int indent)
 {
     assert(obj);
     switch (getType(obj)) {
@@ -520,14 +554,18 @@ void printOn(StringBuffer *buf, oop obj)
             } else {
                 StringBuffer_appendString(buf, "Primitive:");
             }
-            printOn(buf, get(obj, Function, name));
+            printOn(buf, get(obj, Function, name), indent);
             StringBuffer_append(buf, '(');
-            printOn(buf, get(obj, Function, param));
+            printOn(buf, get(obj, Function, param), indent + 1);
+            if (get(obj, Function, param) != null) {
+                StringBuffer_append(buf, '\n');
+                indentOn(buf, indent);
+            }
             StringBuffer_append(buf, ')');
             return;
         }
         case Map: {
-            map_printOn(buf, obj, 0);
+            map_printOn(buf, obj, indent);
             return;
         }
     }
@@ -538,7 +576,7 @@ char *printString(oop obj)
 {
     static StringBuffer buf= BUFFER_INITIALISER;
     StringBuffer_clear(&buf);
-    printOn(&buf, obj);
+    printOn(&buf, obj, 0);
     return StringBuffer_contents(&buf);
 }
 
