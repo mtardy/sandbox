@@ -1,0 +1,6 @@
+// keep a reference to that function local scope that might otherwise been garbage collected
+var mod = require("test-module.txt");
+println(mod.sum(40, 2));
+println(mod.pi);
+var mod2 = require("test-module.txt");
+println(mod2.pi);

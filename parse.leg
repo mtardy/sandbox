@@ -485,7 +485,7 @@ oop newFunc(oop name, oop param, oop body, oop fixed)
     return func;
 }
 
-oop apply(oop func, oop args);
+oop apply(oop scope, oop func, oop args);
 
 oop getSyntaxId(int n, oop key)
 {
@@ -625,7 +625,7 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   l:IDENT                       o:assignOp e:exp   { $$ = newAssign(Assign_proto,    l,    o, e) }
         |   l:postfix DOT   i:IDENT       o:assignOp e:exp   { $$ = newSetMap(SetMember_proto, l, i, o, e) }
         |   l:postfix LBRAC i:exp   RBRAC o:assignOp e:exp   { $$ = newSetMap(SetIndex_proto,  l, i, o, e) }
-        |   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(l, a)) }
+        |   l:syntax2 a:argumentList s:block                 { $$ = (map_append(a, s), apply(globals, l, a)) }
         |   c:cond                                           { $$ = c }
 
 ident   =   l:IDENT                                          { $$ = l }
@@ -724,7 +724,7 @@ prefix  =   PLUS       n:prefix         { $$= n }
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
                     | DOT    s:IDENT        !assignOp           { i = newGetMap(GetMember_proto, i, s) }
                     | LBRAC  p:exp   RBRAC  !assignOp           { i = newGetMap(GetIndex_proto, i, p) }
-                    | a:argumentList                            { i = (null != getSyntax(1, i)) ? apply(getSyntax(1, i), a) : newCall(i, a) }
+                    | a:argumentList                            { i = (null != getSyntax(1, i)) ? apply(globals, getSyntax(1, i), a) : newCall(i, a) }
                     | PLUSPLUS                                  { i = newPostIncrement(i) }
                     | MINUSMINUS                                { i = newPostDecrement(i) }
                     ) *                                         { $$ = i }
@@ -1181,7 +1181,7 @@ oop eval(oop scope, oop ast)
         oop condition  = map_get(ast, condition_symbol );
         oop consequent = map_get(ast, consequent_symbol);
         oop alternate  = map_get(ast, alternate_symbol );
-    return eval(scope, isTrue(eval(scope, condition)) ? consequent : alternate);
+        return eval(scope, isTrue(eval(scope, condition)) ? consequent : alternate);
     }
     case t_While: {
         oop condition = map_get(ast, condition_symbol );
@@ -1406,7 +1406,7 @@ oop eval(oop scope, oop ast)
             jbRecPop();
             return result;
         }
-        return get(func, Function, primitive)(args);
+        return get(func, Function, primitive)(scope, args);
     }
     case t_Invoke: {
         // this is what differs from t_call
@@ -1420,7 +1420,7 @@ oop eval(oop scope, oop ast)
 
         oop args = evalArgs(scope, map_get(ast, args_symbol));
         if (NULL != get(func, Function, primitive)) {
-            return get(func, Function, primitive)(args);
+            return get(func, Function, primitive)(scope, args);
         }
         oop param = get(func, Function, param);
         oop localScope = map_zip(param, args);
@@ -1618,6 +1618,11 @@ oop eval(oop scope, oop ast)
     BINARY(Bitor,     | );
     BINARY(Bitxor,    ^ );
     BINARY(Bitand,    & );
+<<<<<<< HEAD
+=======
+//  BINARY(Equal,     ==);
+//  BINARY(Noteq,     !=);
+>>>>>>> master
     case t_Equal: {
         oop lhs = eval(scope, map_get(ast, lhs_symbol));
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
@@ -1755,7 +1760,7 @@ oop eval(oop scope, oop ast)
     return null;
 }
 
-oop prim_exit(oop params)
+oop prim_exit(oop scope, oop params)
 {
     int status= 0;
     if (map_hasIntegerKey(params, 0)) {
@@ -1765,7 +1770,7 @@ oop prim_exit(oop params)
     exit(status);
 }
 
-oop prim_keys(oop params)
+oop prim_keys(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
     oop arg= get(params, Map, elements)[0].value;
@@ -1774,7 +1779,7 @@ oop prim_keys(oop params)
     return null;
 }
 
-oop prim_values(oop params)
+oop prim_values(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
     oop arg= get(params, Map, elements)[0].value;
@@ -1783,7 +1788,7 @@ oop prim_values(oop params)
     return null;
 }
 
-oop prim_length(oop params)
+oop prim_length(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
         oop arg= get(params, Map, elements)[0].value;
@@ -1805,7 +1810,7 @@ oop prim_length(oop params)
 
 // ISSUE2: how can I tackle the 2 fprintf(stderr, "\nbreak/continue oustide of a loop\n") in prim_invoke and prim_apply
 // in this situation it seems that I don't have access to any AST
-oop prim_invoke(oop params)
+oop prim_invoke(oop scope, oop params)
 {
     oop this= null;      if (map_hasIntegerKey(params, 0)) this=  get(params, Map, elements)[0].value;
     oop func= null;      if (map_hasIntegerKey(params, 1)) func=  get(params, Map, elements)[1].value;
@@ -1816,7 +1821,7 @@ oop prim_invoke(oop params)
         exit(1);
     }
     if (NULL != get(func, Function, primitive)) {
-        return get(func, Function, primitive)(args);
+        return get(func, Function, primitive)(scope, args);
     }
     oop param = get(func, Function, param);
     oop localScope = map_zip(param, args);
@@ -1849,7 +1854,7 @@ oop prim_invoke(oop params)
     return result;
 }
 
-oop apply(oop func, oop args)
+oop apply(oop scope, oop func, oop args)
 {
     if (!is(Function, func)) {
         printf("cannot apply ");
@@ -1857,7 +1862,7 @@ oop apply(oop func, oop args)
         exit(1);
     }
     if (NULL != get(func, Function, primitive)) {
-        return get(func, Function, primitive)(args);
+        return get(func, Function, primitive)(scope, args);
     }
     oop param = get(func, Function, param);
     oop localScope = map_zip(param, args);
@@ -1889,32 +1894,25 @@ oop apply(oop func, oop args)
     return result;
 }
 
-oop prim_apply(oop params) {
+oop prim_apply(oop scope, oop params) {
     oop func= null;      if (map_hasIntegerKey(params, 0)) func=  get(params, Map, elements)[0].value;
     oop args= null;      if (map_hasIntegerKey(params, 1)) args=  get(params, Map, elements)[1].value;
-    return apply(func, args);
+    return apply(scope, func, args);
 }
 
-oop prim_clone(oop params)
+oop prim_clone(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) return clone(get(params, Map, elements)[0].value);
     return null;
 }
 
-oop prim_print(oop params)
+oop prim_print(oop scope, oop params)
 {
     assert(is(Map, params));
     for (int i= 0;  map_hasIntegerKey(params, i);  ++i) {
         print(get(params, Map, elements)[i].value);
     }
     return params;
-}
-
-oop prim_println(oop params)
-{
-    oop res= prim_print(params);
-    printf("\n");
-    return res;
 }
 
 oop evalArgs(oop scope, oop args)
@@ -1931,7 +1929,7 @@ oop evalArgs(oop scope, oop args)
 
 oop AST= NULL;
 
-void readEvalPrint(char *fileName)
+void readEvalPrint(oop scope, char *fileName)
 {
     inputStackPush(fileName);
     input_t *top= inputStack;
@@ -1950,7 +1948,7 @@ void readEvalPrint(char *fileName)
                 continue;
             }             // EOF
             if (opt_v > 1) println(yylval);
-            oop res = eval(globals, yylval);
+            oop res = eval(scope, yylval);
             if (opt_v > 0) println(res);
             assert(jbs == jtop);
         }
@@ -1978,7 +1976,7 @@ void readEvalPrint(char *fileName)
     }
 }
 
-oop prim_import(oop params)
+oop prim_import(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
         char *file= get(get(params, Map, elements)[0].value, String, value);
@@ -1986,14 +1984,19 @@ oop prim_import(oop params)
             yyctx->__limit--;
             ungetc(yyctx->__buf[yyctx->__limit], inputStack->file);
         }
-        readEvalPrint(file);
+        readEvalPrint(scope, file);
     }
     return null;
 }
 
+oop prim_scope(oop scope, oop params)
+{
+    return scope;
+}
+
 #include <sys/resource.h>
 
-oop prim_millis(oop params)
+oop prim_millis(oop scope, oop params)
 {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
@@ -2014,12 +2017,13 @@ int main(int argc, char **argv)
     map_set(globals, intern("values") , makeFunction(prim_values,  intern("values"),  null, null, globals, null));
     map_set(globals, intern("length") , makeFunction(prim_length,  intern("length"),  null, null, globals, null));
     map_set(globals, intern("print")  , makeFunction(prim_print,   intern("print"),   null, null, globals, null));
-    map_set(globals, intern("println"), makeFunction(prim_println, intern("println"), null, null, globals, null));
     map_set(globals, intern("invoke") , makeFunction(prim_invoke,  intern("invoke"),  null, null, globals, null));
     map_set(globals, intern("apply")  , makeFunction(prim_apply,   intern("apply"),   null, null, globals, null));
     map_set(globals, intern("clone")  , makeFunction(prim_clone,   intern("clone"),   null, null, globals, null));
     map_set(globals, intern("import") , makeFunction(prim_import,  intern("import"),  null, null, globals, null));
     map_set(globals, intern("millis") , makeFunction(prim_millis,  intern("millis"),  null, null, globals, null));
+
+    map_set(globals, intern("scope"), makeFunction(prim_scope, intern("scope"), null, null, globals, null));
 
     #define _DO(NAME) NAME##_symbol=intern(#NAME);
     DO_SYMBOLS()
@@ -2044,16 +2048,16 @@ int main(int argc, char **argv)
         ++argv;
         if (!strcmp(*argv, "-v"))  ++opt_v;
         else if (!strcmp(*argv, "-")) {
-            readEvalPrint(NULL);
+            readEvalPrint(globals, NULL);
             repled= 1;
         }
         else {
-            readEvalPrint(*argv);
+            readEvalPrint(globals, *argv);
             repled= 1;
         }
     }
     if (!repled) {
-        readEvalPrint(NULL);
+        readEvalPrint(globals, NULL);
     }
 
     return 0;

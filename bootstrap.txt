@@ -1,0 +1,16 @@
+var __requires__ = {}
+
+fun require(__fileName__) {
+    if (__requires__[__fileName__] != null) {
+        return __requires__[__fileName__]
+    }
+    import(__fileName__); 
+    __requires__[__fileName__]= scope();
+    return scope();
+}
+
+fun println() {
+    apply(print, __arguments__);
+    print("\n");
+    __arguments__;
+}
