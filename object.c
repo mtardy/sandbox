@@ -5,21 +5,33 @@
 #include <assert.h>
 
 #define USE_TAG  1
-
 #define USE_GC   1
 
 #if (USE_GC)
 # include <gc.h>
 #endif
 
+typedef long long int_t;
+
+#define FMT_I "%lli"
+
+void *memcheck(void *ptr)
+{
+    if (NULL == ptr) {
+        fprintf(stderr, "Error: out of memory\n");
+        exit(EX_OSERR); // this is as close as we have for 'resource unavailable'
+    }
+    return ptr;
+}
+
 void *xmalloc(size_t n)
 {
 #if (USE_GC)
     void *mem= GC_malloc(n);
-#else
-    void *mem= calloc(1, n);
-#endif
     assert(mem);
+#else
+    void *mem= memcheck(calloc(1, n));
+#endif
     return mem;
 }
 
@@ -27,10 +39,10 @@ void *xrealloc(void *p, size_t n)
 {
 #if (USE_GC)
     void *mem= GC_realloc(p, n);
-#else
-    void *mem= realloc(p, n);
-#endif
     assert(mem);
+#else
+    void *mem= memcheck(realloc(p, n));
+#endif
     return mem;
 }
 
@@ -39,11 +51,11 @@ char *xstrdup(char *s)
 #if (USE_GC)
     size_t len= strlen(s);
     char  *mem= GC_malloc_atomic(len + 1);
+    assert(mem);
     memcpy(mem, s, len + 1);
 #else
-    char *mem= strdup(s);
+    char *mem= memcheck(strdup(s));
 #endif
-    assert(mem);
     return mem;
 }
 
@@ -69,7 +81,7 @@ struct Undefined {
 
 struct Integer {
     type_t type;
-    int _value;
+    int_t _value;
 };
 
 struct String {
@@ -126,10 +138,17 @@ const oop null = &_null;
 
 int is(type_t type, oop obj);
 
+#if (USE_TAG)
+int isTag(oop obj)
+{
+    return ((intptr_t)obj & 1);
+}
+#endif
+
 int isInteger(oop obj)
 {
 #if (USE_TAG)
-    return (intptr_t)obj & 1;
+    return ((intptr_t)obj & 1) || is(Integer, obj);
 #else
     return is(Integer, obj);
 #endif
@@ -164,15 +183,6 @@ oop _checkType(oop ptr, type_t type, char *file, int line)
 #define get(PTR, TYPE, FIELD)           (_checkType(PTR, TYPE, __FILE__, __LINE__)->TYPE.FIELD)
 #define set(PTR, TYPE, FIELD, VALUE)    (_checkType(PTR, TYPE, __FILE__, __LINE__)->TYPE.FIELD = VALUE)
 
-void *memcheck(void *ptr)
-{
-    if (NULL == ptr) {
-        fprintf(stderr, "Error: out of memory\n");
-        exit(EX_OSERR); // this is as close as we have for 'resource unavailable'
-    }
-    return ptr;
-}
-
 #include "buffer.h"
 DECLARE_STRING_BUFFER(char, StringBuffer);
 
@@ -180,48 +190,43 @@ void print(oop ast);
 void println(oop ast);
 void printOn(StringBuffer *buf, oop obj, int indent);
 
-int getInteger(oop obj)
+int_t getInteger(oop obj)
 {
+#if (USE_TAG)
+    if (isTag(obj)) return (intptr_t)obj >> 1;
+#endif
     if (!isInteger(obj)) {
-        fprintf(stderr, "\nNon-integer in arithmetic expression\n");
+       fprintf(stderr, "\nNon-integer in arithmetic expression\n");
         exit(1);
     }
-#if (USE_TAG)
-    return (intptr_t)obj >> 1;
-#else
     return get(obj, Integer, _value);
-#endif
 }
 
-oop makeInteger(int value)
+#if (USE_TAG)
+int isIntegerValue(int_t value)
+{
+    return (((intptr_t)value << 1) >> 1) == value;
+//  return -32 <= value && value < 32;
+}
+#endif
+
+oop makeInteger(int_t value)
 {
 #if (USE_TAG)
-    return (oop) (((intptr_t)value << 1) | 1);
-#else
-    oop newInt = memcheck(malloc(sizeof(union object)));
+    if (isIntegerValue(value)) return (oop)(((intptr_t)value << 1) | 1);
+#endif
+    oop newInt = malloc(sizeof(union object));
     newInt->type = Integer;
     newInt->Integer._value = value;
     return newInt;
-#endif
 }
 
-// value will be copied
 oop makeString(char *value)
 {
-    oop newString = memcheck(malloc(sizeof(union object)));
+    oop newString = malloc(sizeof(union object));
     newString->type = String;
-    newString->String.value = memcheck(strdup(value));
+    newString->String.value = strdup(value);
     newString->String.size = strlen(value);
-    return newString;
-}
-
-// value will be used directly
-oop makeStringFrom(char *value, size_t l)
-{
-    oop newString = memcheck(malloc(sizeof(union object)));
-    newString->type = String;
-    newString->String.value = value;
-    newString->String.size = l;
     return newString;
 }
 
@@ -230,56 +235,48 @@ size_t string_size(oop s)
     return get(s, String, size);
 }
 
-oop string_slice(oop str, ssize_t start, ssize_t stop) {
-    assert(is(String, str));
-    size_t len = string_size(str);
-    if (start < 0) start= start + len; 
-    if (stop  < 0) stop= stop + len;
-    if (start < 0 || start > len) return NULL;
-    if (stop  < 0 || stop  > len) return NULL;
-    if (start > stop) return NULL;
-
-    size_t cpylen = stop - start;
-    char *slice= memcheck(malloc(sizeof(char) * (cpylen + 1)));
-    memcpy(slice, get(str, String, value) + start, cpylen);
-    slice[cpylen]= '\0';
-    return makeStringFrom(slice, cpylen);
-}
-
 oop string_concat(oop str1, oop str2)
 {
     size_t len = string_size(str1) + string_size(str2);
-    char *concat = memcheck(malloc(sizeof(char) * len + 1));
+    char *concat = malloc(sizeof(char) * len + 1);
     memcpy(concat, get(str1, String, value), string_size(str1));
     memcpy(concat + string_size(str1), get(str2, String, value), string_size(str2));
     concat[len]= '\0';
-    return makeStringFrom(concat, len);
+    oop newString = malloc(sizeof(union object));
+    newString->type = String;
+    newString->String.value = concat;
+    newString->String.size = len;
+    return newString;
 }
 
 oop string_mul(oop str, oop factor)
 {
     ssize_t len = string_size(str) * getInteger(factor);
     if (len < 0) len = 0;
-    char *concat = memcheck(malloc(sizeof(char) * len + 1));
+    char *concat = malloc(sizeof(char) * len + 1);
     for (int i=0; i < getInteger(factor); ++i) {
         memcpy(concat + (i * string_size(str)), get(str, String, value), string_size(str));
     }
     concat[len]= '\0';
-    return makeStringFrom(concat, len);
+    oop newString = malloc(sizeof(union object));
+    newString->type = String;
+    newString->String.value = concat;
+    newString->String.size = len;
+    return newString;
 }
 
 oop makeSymbol(char *name)
 {
-    oop newSymb = memcheck(malloc(sizeof(union object)));
+    oop newSymb = malloc(sizeof(union object));
     newSymb->type = Symbol;
-    newSymb->Symbol.name = memcheck(strdup(name));
+    newSymb->Symbol.name = strdup(name);
     newSymb->Symbol.prototype = 0;
     return newSymb;
 }
 
 oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
 {
-    oop newFunc = memcheck(malloc(sizeof(union object)));
+    oop newFunc = malloc(sizeof(union object));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
     newFunc->Function.name = name;
@@ -292,7 +289,7 @@ oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop paren
 
 oop makeMap()
 {
-    oop newMap = memcheck(malloc(sizeof(union object)));
+    oop newMap = malloc(sizeof(union object));
     newMap->type = Map;
     return newMap;
 }
@@ -386,7 +383,7 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
     // check capacity and expand if needed
     if (map_size(map) >= get(map, Map, capacity)) {
         size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
-        set(map, Map, elements, memcheck(realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity)));
+        set(map, Map, elements, realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity));
         set(map, Map, capacity, newCapacity);
     }
 
@@ -478,26 +475,6 @@ oop map_values(oop map)
     return values;
 }
 
-oop map_slice(oop map, ssize_t start, ssize_t stop) {
-    assert(is(Map, map));
-    size_t len = map_size(map);
-    if (start < 0) start= start + len; 
-    if (stop  < 0) stop= stop + len;
-    if (start < 0 || start > len) return NULL;
-    if (stop  < 0 || stop  > len) return NULL;
-    if (start > stop) return NULL;
-
-    oop slice= makeMap();
-    if (start < stop) {
-        if (!map_hasIntegerKey(map, start   )) return NULL;
-        if (!map_hasIntegerKey(map, stop - 1)) return NULL;
-        for (size_t i= start; i < stop; ++i) {
-            map_append(slice, get(map, Map, elements)[i].value);
-        }
-    }
-    return slice;
-}
-
 DECLARE_BUFFER(oop, OopStack);
 OopStack printing = BUFFER_INITIALISER;
 
@@ -573,8 +550,8 @@ void printOn(StringBuffer *buf, oop obj, int indent)
             return;
         }
         case Integer: {
-            char tmp[32];
-            int length = snprintf(tmp, sizeof(tmp), "%i", getInteger(obj));
+            char tmp[40];
+            int length = snprintf(tmp, sizeof(tmp), FMT_I, getInteger(obj));
             StringBuffer_appendAll(buf, tmp, length);
             return;
         }
@@ -596,7 +573,7 @@ void printOn(StringBuffer *buf, oop obj, int indent)
             printOn(buf, get(obj, Function, name), indent);
             StringBuffer_append(buf, '(');
             printOn(buf, get(obj, Function, param), indent + 1);
-            if (get(obj, Function, param) != null) {
+            if (is(Map, get(obj, Function, param)) && map_size(get(obj, Function, param)) > 0) {
                 StringBuffer_append(buf, '\n');
                 indentOn(buf, indent);
             }

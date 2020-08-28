@@ -1,0 +1,30 @@
+syntax class (name) body {
+   `{ __name__ = @name;
+       @body;
+       scope()
+    }
+}
+
+var ns = {
+    __name__ = #"testing";
+    var counter =  0;
+    fun inc () { ns.counter += 1 };
+    fun dec () { ns.counter -= 1 };
+    scope()
+};
+
+println(ns.counter);
+
+ns.inc();  println(ns.counter);
+ns.inc();  println(ns.counter);
+ns.inc();  println(ns.counter);
+
+ns.dec();  println(ns.counter);
+ns.dec();  println(ns.counter);
+ns.dec();  println(ns.counter);
+
+var obj = { __proto__ = ns;  scope() };
+
+obj.inc();
+
+println(obj.counter);

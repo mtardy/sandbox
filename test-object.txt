@@ -1,25 +1,25 @@
 var Object = { __name__: #"Object" };
 
-print("Object is ", Object);
+println("Object is ", Object);
 
 var Point = { __name__: #"Point", __proto__ : Object };
 
-print("Point is ", Point);
+println("Point is ", Point);
 
 Object.new = fun () {
-    print("ARGS are ", __arguments__);
+    println("ARGS are ", __arguments__);
     var obj= { __proto__ : this };
     var init= this.init;
-    print("INIT is ", init);
+    println("INIT is ", init);
     init && invoke(obj, init, __arguments__);
     obj;
 };
 
-print("Object.new is ", Object.new);
+println("Object.new is ", Object.new);
 
-print("Point.new is ", Point.new);
+println("Point.new is ", Point.new);
 
-print("Object.new() is ", Object.new());
+println("Object.new() is ", Object.new());
 
 Point.init = fun (x, y) {
     this.x = x;
@@ -28,7 +28,7 @@ Point.init = fun (x, y) {
 
 var p = Point.new(3, 4);
 
-print("Point.new(3, 4) is ", p);
+println("Point.new(3, 4) is ", p);
 
 
 
@@ -36,9 +36,9 @@ Object.clone = fun () { clone(this) }
 
 var q = p.clone();
 
-print("clone is ", q);
+println("clone is ", q);
 
-Object.println = fun () { this.print();  print('\n');  this; }
+Object.println = fun () { this.print();  print("\n");  this; }
 
 Object.print = fun () {
     var proto= this.__proto__;
@@ -69,7 +69,7 @@ fun println() {
 }
 
 fun makeAst() {
-    print("Making an AST!")
+    println("Making an AST!")
     return t
 }
 
@@ -87,10 +87,26 @@ syntax until(c, b) {
     return `(while (!@c) @b)
 }
 
-var x = 0
+var x = 0;
 /*
 until(x==10) {
     println(x++)
 }
 */
-(`x).println()
+
+println(`x);
+
+AST.__proto__ = Object;
+
+for (key in AST) AST[key].__proto__ = AST;
+
+/*
+{
+    var k= keys(AST);
+    var n= length(k);
+    for (i = 0;  i < n;  ++i)
+        AST[k[i]].__proto__ = AST;
+};
+*/
+
+(`x).println();
