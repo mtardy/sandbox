@@ -1,0 +1,10 @@
+s = "hello"
+b = [2, 4, 6]
+b.pizza= "ok"
+println(s[-4:-3])
+println(s[:-3])
+println(s[-4:])
+println(s[:])
+println(s[:])
+m = { 3: "three", 1: "four", 2: "five" }
+println({}[-0]);
