@@ -4,3 +4,4 @@ println(mod.sum(40, 2));
 println(mod.pi);
 var mod2 = require("test-module.txt");
 println(mod2.pi);
+println(invoke(mod2, mod2.pi, [2, 4]))
