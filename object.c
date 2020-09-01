@@ -373,7 +373,8 @@ oop map_get(oop map, oop key)
     return get(map, Map, elements)[pos].value;
 }
 
-#define MAP_CHUNK_SIZE 8
+#define MAP_MIN_SIZE  4
+#define MAP_GROW_SIZE 2
 
 oop map_insert(oop map, oop key, oop value, size_t pos)
 {
@@ -387,7 +388,8 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
 
     // check capacity and expand if needed
     if (map_size(map) >= get(map, Map, capacity)) {
-        size_t newCapacity = get(map, Map, capacity) + MAP_CHUNK_SIZE;
+        size_t newCapacity = get(map, Map, capacity) * MAP_GROW_SIZE;
+	if (newCapacity < MAP_MIN_SIZE) newCapacity= MAP_MIN_SIZE;
         set(map, Map, elements, realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity));
         set(map, Map, capacity, newCapacity);
     }
