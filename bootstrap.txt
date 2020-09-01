@@ -14,3 +14,7 @@ fun println() {
     print("\n");
     __arguments__;
 }
+
+fun millis() {
+    microseconds() / 1000;
+}
