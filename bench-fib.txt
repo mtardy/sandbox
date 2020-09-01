@@ -1,0 +1,17 @@
+fun f(n) { if (n < 2) 1 else 1 + f(n-1) + f(n-2) }
+
+start = microseconds();
+
+n = f(30);
+print(n, "\n");
+
+time = microseconds() - start;
+
+secs =        time / 1000000;
+usec = String(time % 1000000);
+
+while (length(usec) < 6) usec = "0"+usec;
+
+print(secs, ".", usec, " seconds\n");
+
+print(n * 1000 / (time / 1000), " function calls per second\n");

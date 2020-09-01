@@ -1,0 +1,37 @@
+fun sieve(n) {
+    var nPrimes= 0;
+    var isPrime= {};
+    var i= 0;
+    while (i < n) {
+        isPrime[i]= 1;
+	i= i+1;
+    }
+    i= 2;
+    while (i < n) {
+        if (isPrime[i]) {
+	    nPrimes = nPrimes + 1;
+	    var j= i+i;
+	    while (j < n) {
+	        isPrime[j]= 0;
+		j= j + i;
+	    }
+	}
+	i = i + 1;
+    }
+    return nPrimes;
+}
+
+start = microseconds();
+
+for (var i= 0;  i < 20;  i = i + 1) {
+    print(sieve(8192), "\n");
+}
+
+time = microseconds() - start;
+
+secs =        time / 1000000;
+usec = String(time % 1000000);
+
+while (length(usec) < 6) usec = "0"+usec;
+
+print(secs, ".", usec, " seconds\n");
