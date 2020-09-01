@@ -1988,7 +1988,10 @@ int main(int argc, char **argv)
         readEvalPrint(globals, NULL);
     }
 
-    printf("[GC: %lli bytes allocated]\n", nalloc);
+    if      (nalloc <           1024) printf("[GC: %lli bytes allocated]\n",         nalloc                   );
+    else if (nalloc <      1024*1024) printf("[GC: %lli kB allocated]\n",            nalloc /            1024 );
+    else if (nalloc < 1024*1024*1024) printf("[GC: %.2f MB allocated]\n",    (double)nalloc / (     1024*1024));
+    else                              printf("[GC: %.2f GB allocated]\n",    (double)nalloc / (1024*1024*1024));
 
     return 0;
 
