@@ -121,11 +121,19 @@ struct Pair {
     oop value;
 };
 
+enum {
+    MAP_ENCLOSED = 1 << 0,    // set when map is used as a scope and closed over by a function
+};
+
 struct Map {
     type_t type;
+    int    flags;
     struct Pair *elements; // even are keys, odd are values   [ key val key val key val ]
-    size_t size;
     size_t capacity;
+    union {
+	size_t size;       // free Maps will be reset to 0 size on allocation
+	oop    pool;       // free list of Map objects
+    };
 };
 
 union object {
@@ -294,7 +302,7 @@ oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop paren
 
 oop makeMap()
 {
-    oop newMap = malloc(sizeof(union object));
+    oop newMap = malloc(sizeof(union object));			assert(0 == newMap->Map.flags);
     newMap->type = Map;
     return newMap;
 }
