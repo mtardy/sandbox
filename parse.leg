@@ -50,21 +50,14 @@ typedef struct jb_record
 
 jb_record *jbs= NULL;
 
-jb_record *jbRecPush() {
-    jb_record *newJbRec = malloc(sizeof(jb_record));
-    newJbRec->result = null;
-    newJbRec->next = jbs;
-    jbs = newJbRec;
-    return newJbRec;
-}
+#define jbRecPush()				\
+    struct jb_record jbrec;			\
+    jbrec.next= jbs;				\
+    jbs= &jbrec
 
-jb_record *jbRecPop() {
-    assert(jbs);
-    jb_record *head = jbs;
-    jbs = head->next;
-    return head;
-}
-
+#define jbRecPop()				\
+    assert(jbs == &jbrec);			\
+    jbs= jbrec.next
 
 // this is the global scope
 oop globals= 0;
@@ -85,6 +78,7 @@ DO_SYMBOLS()
 DO_PROTOS()
 #undef _DO
 
+int opt_g= 0;
 int opt_v= 0;
 oop mrAST= &_null;
 
@@ -761,7 +755,6 @@ value   =   n:NUMBER                { $$ = newInteger(n) }
         |   NULL                    { $$ = null }
         |   i:IDENT                 { $$ = newGetVariable(i) }
         |   LPAREN i:stmt  RPAREN   { $$ = i }
-        |   b:block                 { $$ = b }
 
 string  =   s:STRING -              { $$ = s }
 
@@ -887,11 +880,11 @@ SQUOTE  =    "'"
 ;
 
 
-oop map_zip(oop keys, oop values)
+oop map_zip(oop map, oop keys, oop values)
 {
+    assert(is(Map, map));
     assert(is(Map, keys));
     assert(is(Map, values));
-    oop map= makeMap();
     size_t sk= map_size(keys), sv= map_size(values);
     if (sk < sv) sk= sv;
     for (size_t i= 0;  i < sk;  ++i) {
@@ -1139,6 +1132,38 @@ oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
     return rhs;
 }
 
+oop freeScopes= 0; // pool of free scopes
+
+oop fixScope(oop scope)        // prevent this scope and its parents from being recycled
+{                                                       assert(is(Map, scope));
+    oop tmp= scope;
+    while (is(Map, tmp) && (0 == (tmp->Map.flags & MAP_ENCLOSED))) {
+        tmp->Map.flags |= MAP_ENCLOSED;
+        tmp= map_get(tmp, __proto___symbol);
+    }
+    return scope;
+}
+
+oop newScope(oop parent)
+{
+    if (0 == freeScopes) freeScopes= makeMap();
+    oop scope= freeScopes;                              assert(is(Map, scope));
+    freeScopes= freeScopes->Map.pool;
+    scope->Map.size= 0;
+    map_set(scope, __proto___symbol, parent);
+    return scope;
+}
+
+void delScope(oop scope)
+{                                                       assert(is(Map, scope));
+    if (scope->Map.flags & MAP_ENCLOSED) {
+        printf("IGNORE %p\n", scope);
+        return;
+    }
+    scope->Map.pool= freeScopes;
+    freeScopes= scope;
+}
+
 oop evalArgs(oop scope, oop args);
 
 oop apply(oop scope, oop this, oop func, oop args, oop ast)
@@ -1150,28 +1175,32 @@ oop apply(oop scope, oop this, oop func, oop args, oop ast)
     }
 
     oop param = get(func, Function, param);
-    oop localScope = map_zip(param, args);
+    oop localScope = newScope(get(func, Function, parentScope));
+    map_zip(localScope, param, args);
     map_set(localScope, this_symbol, this);
     map_set(localScope, __arguments___symbol, args);
-    map_set(localScope, __proto___symbol, get(func, Function, parentScope));
     jbRecPush();
     trace(ast, func);
     int jbt = sigsetjmp(jbs->jb, 0);
     switch (jbt) {
         case j_return: {
             untrace(ast);
+	    delScope(localScope);
             oop result = jbs->result;
             jbRecPop();
             return result;
         }
         case j_break: {
+	    delScope(localScope);
             runtimeError("break outside of a loop or switch");
         }
         case j_continue: {
+	    delScope(localScope);
             runtimeError("continue outside of a loop");
         }
         case j_throw: {
             untrace(ast);
+	    delScope(localScope);
             oop res= jbs->result;
             jbRecPop();
             jbs->result= res;
@@ -1180,6 +1209,7 @@ oop apply(oop scope, oop this, oop func, oop args, oop ast)
     }
     oop result= eval(localScope, get(func, Function, body));
     untrace(ast);
+    delScope(localScope);
     jbRecPop();
     return result;
 }
@@ -1313,13 +1343,14 @@ oop eval(oop scope, oop ast)
         oop update     = map_get(ast, update_symbol );
         oop body       = map_get(ast, body_symbol);
         oop result     = null;
-        oop localScope = newObject(scope);
+        oop localScope = newScope(scope);
 
         jbRecPush();
         int jbt = sigsetjmp(jbs->jb, 0);
         switch (jbt) {
             case j_return:
             case j_throw: {
+                delScope(localScope);
                 oop result = jbs->result;
                 jbRecPop();
                 assert(jbs);
@@ -1328,6 +1359,7 @@ oop eval(oop scope, oop ast)
                 assert(0);
             }
             case j_break: {
+                delScope(localScope);
                 jbRecPop();
                 return result;
             }
@@ -1340,6 +1372,7 @@ oop eval(oop scope, oop ast)
             result= eval(localScope, body);
         restart_for:;
         }
+        delScope(localScope);
         jbRecPop();
         return result;
     }
@@ -1348,12 +1381,13 @@ oop eval(oop scope, oop ast)
         oop name   =             map_get(ast, name_symbol      ) ;
         oop body   =             map_get(ast, body_symbol      ) ;
         oop result = null;
-        oop localScope = newObject(scope);
+        oop localScope = newScope(scope);
         jbRecPush();
         int jbt = sigsetjmp(jbs->jb, 0);
         switch (jbt) {
             case j_return:
             case j_throw: {
+                delScope(localScope);
                 oop result = jbs->result;
                 jbRecPop();
                 assert(jbs);
@@ -1362,6 +1396,7 @@ oop eval(oop scope, oop ast)
                 assert(0);
             }
             case j_break: {
+                delScope(localScope);
                 jbRecPop();
                 return result;
             }
@@ -1374,6 +1409,7 @@ oop eval(oop scope, oop ast)
             result= eval(localScope, body);
         restart_forin:;
         }
+        delScope(localScope);
         jbRecPop();
         return result;
     }
@@ -1435,7 +1471,7 @@ oop eval(oop scope, oop ast)
         oop param = map_get(ast, param_symbol);
         oop body  = map_get(ast, body_symbol);
         oop fixed = map_get(ast, fixed_symbol);
-        oop func  = makeFunction(NULL, name, param, body, scope, fixed);
+        oop func  = makeFunction(NULL, name, param, body, fixScope(scope), fixed);
         if (opt_v > 4) {
             printf("funcscope: ");
             println(scope);
@@ -1516,16 +1552,18 @@ oop eval(oop scope, oop ast)
             if (null == catch) {
                 return eval(scope, finally);
             }
-            oop localScope= newObject(scope);
+            oop localScope= newScope(scope);
             setVariable(localScope, exception, res);
 
             jbRecPush();
             jbt= sigsetjmp(jbs->jb, 0);
             if (0 == jbt) {
                 eval(localScope, catch);
+                delScope(localScope);
                 jbRecPop();
                 return eval(scope, finally);
             }
+            delScope(localScope);
             // something happend in the catch block
             res= jbs->result;
             jbRecPop();
@@ -1540,12 +1578,13 @@ oop eval(oop scope, oop ast)
         int i = 0;
         oop index;
         oop statement, res;
-        oop localScope = newObject(scope);
+        oop localScope = newScope(scope);
         while ((index = makeInteger(i)), map_hasKey(statements, index)) {
             statement = map_get(statements, index);
             res = eval(localScope, statement);
             i++;
         }
+        delScope(localScope);
         return res;
     }
     case t_GetVariable: {
@@ -1918,7 +1957,7 @@ oop prim_String(oop scope, oop params)
 
 oop prim_scope(oop scope, oop params)
 {
-    return scope;
+    return fixScope(scope);
 }
 
 #include <sys/resource.h>
@@ -1971,10 +2010,13 @@ int main(int argc, char **argv)
     DO_PROTOS()
     #undef _DO
 
+    fixScope(globals);
+
     int repled = 0;
     while (argc-- > 1) {
         ++argv;
-        if (!strcmp(*argv, "-v"))  ++opt_v;
+        if      (!strcmp(*argv, "-g"))  ++opt_g;
+        else if (!strcmp(*argv, "-v"))  ++opt_v;
         else if (!strcmp(*argv, "-")) {
             readEvalPrint(globals, NULL);
             repled= 1;
@@ -1988,10 +2030,12 @@ int main(int argc, char **argv)
         readEvalPrint(globals, NULL);
     }
 
-    if      (nalloc <           1024) printf("[GC: %lli bytes allocated]\n",         nalloc                   );
-    else if (nalloc <      1024*1024) printf("[GC: %lli kB allocated]\n",            nalloc /            1024 );
-    else if (nalloc < 1024*1024*1024) printf("[GC: %.2f MB allocated]\n",    (double)nalloc / (     1024*1024));
-    else                              printf("[GC: %.2f GB allocated]\n",    (double)nalloc / (1024*1024*1024));
+    if (opt_g) {
+	if      (nalloc <           1024) printf("[GC: %lli bytes allocated]\n",         nalloc                   );
+	else if (nalloc <      1024*1024) printf("[GC: %lli kB allocated]\n",            nalloc /            1024 );
+	else if (nalloc < 1024*1024*1024) printf("[GC: %.2f MB allocated]\n",    (double)nalloc / (     1024*1024));
+	else                              printf("[GC: %.2f GB allocated]\n",    (double)nalloc / (1024*1024*1024));
+    }
 
     return 0;
 
