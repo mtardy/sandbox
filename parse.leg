@@ -1910,6 +1910,12 @@ oop prim_import(oop scope, oop params)
     return null;
 }
 
+oop prim_String(oop scope, oop params)
+{
+    if (!map_hasIntegerKey(params, 0)) return null;
+    return makeString(printString(get(params, Map, elements)[0].value));
+}
+
 oop prim_scope(oop scope, oop params)
 {
     return scope;
@@ -1943,6 +1949,7 @@ int main(int argc, char **argv)
     map_set(globals, intern("clone"       ), makeFunction(prim_clone,        intern("clone"       ), null, null, globals, null));
     map_set(globals, intern("import"      ), makeFunction(prim_import,       intern("import"      ), null, null, globals, null));
     map_set(globals, intern("microseconds"), makeFunction(prim_microseconds, intern("microseconds"), null, null, globals, null));
+    map_set(globals, intern("String"      ), makeFunction(prim_String      , intern("String"      ), null, null, globals, null));
 
     map_set(globals, intern("scope"), makeFunction(prim_scope, intern("scope"), null, null, globals, null));
 
@@ -1980,6 +1987,8 @@ int main(int argc, char **argv)
     if (!repled) {
         readEvalPrint(globals, NULL);
     }
+
+    printf("[GC: %lli bytes allocated]\n", nalloc);
 
     return 0;
 

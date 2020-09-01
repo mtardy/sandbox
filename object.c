@@ -24,8 +24,11 @@ void *memcheck(void *ptr)
     return ptr;
 }
 
+unsigned long long nalloc= 0;
+
 void *xmalloc(size_t n)
 {
+    nalloc += n;
 #if (USE_GC)
     void *mem= GC_malloc(n);
     assert(mem);
@@ -37,6 +40,7 @@ void *xmalloc(size_t n)
 
 void *xrealloc(void *p, size_t n)
 {
+    nalloc += n;
 #if (USE_GC)
     void *mem= GC_realloc(p, n);
     assert(mem);
@@ -53,6 +57,7 @@ char *xstrdup(char *s)
     char  *mem= GC_malloc_atomic(len + 1);
     assert(mem);
     memcpy(mem, s, len + 1);
+    nalloc += len;
 #else
     char *mem= memcheck(strdup(s));
 #endif
