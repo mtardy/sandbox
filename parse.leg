@@ -6,6 +6,8 @@
  * run:        echo "3+4"  | ./parse
  */
 
+#include <stdarg.h>
+
 #define DO_PROTOS()                                                                                     \
     _DO(If) _DO(While) _DO(Do) _DO(For) _DO(ForIn) _DO(Switch) _DO(Call)                                \
     _DO(Invoke) _DO(Func) _DO(Block) _DO(Declaration) _DO(Assign)                                       \
@@ -83,6 +85,7 @@ int opt_v= 0;
 oop mrAST= &_null;
 
 void printBacktrace(oop top);
+void runtimeError(char *fmt, ...);
 
 typedef struct input_t
 {
@@ -171,7 +174,18 @@ oop getVariable(oop object, oop key)
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
         if (null == object) {
-            return null;
+	    runtimeError("Undefined: %s", printString(key));
+        }
+    }
+    return map_get(object, key);
+}
+
+oop getMember(oop object, oop key)
+{
+    while (!map_hasKey(object, key)) {
+        object = map_get(object, __proto___symbol);
+        if (null == object) {
+	    return null;
         }
     }
     return map_get(object, key);
@@ -190,14 +204,10 @@ oop setVariable(oop object, oop key, oop value)
     return map_set(obj, key, value);
 }
 
-oop getMember(oop object, oop key)
+oop getProperty(oop object, oop key)
 {
     if (!map_hasKey(object, key)) {
-        printf("\nUndefined: .");
-        println(key);
-        printBacktrace(mrAST);
-        exit(1);
-        return null;
+	runtimeError("Undefined: .%s", printString(key));
     }
     return map_get(object, key);
 }
@@ -979,10 +989,15 @@ void printBacktrace(oop top)
     printf("\n");
 }
 
-void runtimeError(char *msg)
+void runtimeError(char *fmt, ...)
 {
     fflush(stdout);
-    fprintf(stderr, "\n%s\n", msg);
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "\n");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
     printBacktrace(mrAST);
     exit(1);
 }
@@ -1526,14 +1541,14 @@ oop eval(oop scope, oop ast)
     case t_GetMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
-        return getVariable(map, key);
+        return getMember(map, key);
     }
     case t_SetMember: {
         oop map = eval(scope, map_get(ast, map_symbol));
         oop key = map_get(ast, key_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
-        if (null != op) value= applyOperator(ast, op, getMember(map, key), value);
+        if (null != op) value= applyOperator(ast, op, getProperty(map, key), value);
         if (is(Function, value) && null == get(value, Function, name)) {
             set(value, Function, name, key);
         }
@@ -1549,7 +1564,7 @@ oop eval(oop scope, oop ast)
                 }
                 return makeInteger(unescape(get(map, String, value))[getInteger(key)]);
             case Map:
-                return map_get(map, key);
+                return getVariable(map, key);
             default:
                 runtimeError("GetIndex on non Map or String");
         }
@@ -1856,16 +1871,10 @@ void readEvalPrint(oop scope, char *fileName)
     oop res = jbs->result;
     jbRecPop();
     switch (jbt) {
-        case j_return:
-            runtimeError("return outside of a function");
-        case j_break:
-            runtimeError("break outside of a loop or switch");
-        case j_continue:
-            runtimeError("continue outside of a loop");
-        case j_throw:
-            printf("\nunhandled exception: %s\n", printString(res));
-            printBacktrace(mrAST);
-            exit(1);
+        case j_return:    runtimeError("return outside of a function");
+        case j_break:     runtimeError("break outside of a loop or switch");
+        case j_continue:  runtimeError("continue outside of a loop");
+        case j_throw:     runtimeError("unhandled exception: %s", printString(res));
     }
 }
 
