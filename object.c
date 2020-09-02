@@ -328,14 +328,20 @@ int oopcmp(oop a, oop b)
     type_t ta = getType(a), tb = getType(b);
     if (ta == tb) {
         switch (getType(a)) {
-        case Integer:
-            return getInteger(a) - getInteger(b);
-        case String:
-            return strcmp(get(a, String, value), get(b, String, value));
-        default:
-            if (a < b) return -1;
-            if (a > b) return  1;
-            return 0;
+	    case Integer: {
+		int l= getInteger(a), r= getInteger(b);
+		if (l < r) return -1;
+		if (l > r) return  1;
+		return 0;
+	    }
+	    case String:
+		return strcmp(get(a, String, value), get(b, String, value));
+	    default: {
+		intptr_t l= (intptr_t)a, r= (intptr_t)b;
+		if (l < r) return -1;
+		if (l > r) return  1;
+		return 0;
+	    }
         }
     }
     return ta - tb;
