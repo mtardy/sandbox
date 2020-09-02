@@ -230,7 +230,7 @@ oop makeInteger(int_t value)
 #if (USE_TAG)
     if (isIntegerValue(value)) return (oop)(((intptr_t)value << 1) | 1);
 #endif
-    oop newInt = malloc(sizeof(union object));
+    oop newInt = malloc(sizeof(struct Integer));
     newInt->type = Integer;
     newInt->Integer._value = value;
     return newInt;
@@ -238,7 +238,7 @@ oop makeInteger(int_t value)
 
 oop makeString(char *value)
 {
-    oop newString = malloc(sizeof(union object));
+    oop newString = malloc(sizeof(struct String));
     newString->type = String;
     newString->String.value = strdup(value);
     newString->String.size = strlen(value);
@@ -257,7 +257,7 @@ oop string_concat(oop str1, oop str2)
     memcpy(concat, get(str1, String, value), string_size(str1));
     memcpy(concat + string_size(str1), get(str2, String, value), string_size(str2));
     concat[len]= '\0';
-    oop newString = malloc(sizeof(union object));
+    oop newString = malloc(sizeof(struct String));
     newString->type = String;
     newString->String.value = concat;
     newString->String.size = len;
@@ -273,7 +273,7 @@ oop string_mul(oop str, oop factor)
         memcpy(concat + (i * string_size(str)), get(str, String, value), string_size(str));
     }
     concat[len]= '\0';
-    oop newString = malloc(sizeof(union object));
+    oop newString = malloc(sizeof(struct String));
     newString->type = String;
     newString->String.value = concat;
     newString->String.size = len;
@@ -282,7 +282,7 @@ oop string_mul(oop str, oop factor)
 
 oop makeSymbol(char *name)
 {
-    oop newSymb = malloc(sizeof(union object));
+    oop newSymb = malloc(sizeof(struct Symbol));
     newSymb->type = Symbol;
     newSymb->Symbol.name = strdup(name);
     newSymb->Symbol.prototype = 0;
@@ -291,7 +291,7 @@ oop makeSymbol(char *name)
 
 oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
 {
-    oop newFunc = malloc(sizeof(union object));
+    oop newFunc = malloc(sizeof(struct Function));
     newFunc->type = Function;
     newFunc->Function.primitive = primitive;
     newFunc->Function.name = name;
@@ -304,7 +304,7 @@ oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop paren
 
 oop makeMap()
 {
-    oop newMap = malloc(sizeof(union object));			assert(0 == newMap->Map.flags);
+    oop newMap = malloc(sizeof(struct Map));			assert(0 == newMap->Map.flags);
     newMap->type = Map;
     return newMap;
 }
