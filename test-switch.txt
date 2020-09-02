@@ -1,0 +1,10 @@
+for(i=0; i <= 5; ++i) {
+    switch (i) {
+        case 0: println("zero"); break;
+        case 1: println("one"); break;
+        case 1+1: println("two"); break;
+        case 1+1+1: println("three"); break;
+        case 2*2: println("four"); break;
+        case 20/4: println("five");
+    }
+}
