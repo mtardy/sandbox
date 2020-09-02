@@ -1,15 +1,20 @@
 LEG	= leg
 CC	= cc
-CFLAGS	= -Wall -g
-LDLIBS	= -L/usr/local/lib -lgc
+CFLAGS	= -I/usr/local/include -I/opt/local/include -Wall -Wno-unused-label -g
+LDLIBS	= -L/usr/local/lib -L/opt/local/lib -lgc
+
+all : parse
 
 # moved LDLIBS to end because ld scans files from left to right and collects only required symbols
 
-parse: parse.c object.c
-	$(CC) $(CFLAGS) -o parse parse.c $(LDLIBS)
+%: %.c object.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
-parse.c: parse.leg
-	$(LEG) -o parse.c parse.leg
+%.c: %.leg
+	$(LEG) -o $@ $<
 
 clean:
-	rm parse parse.c
+	rm -f parse parse.c
+
+opt:
+	$(MAKE) CFLAGS="-DNDEBUG -O3 -fomit-frame-pointer"
