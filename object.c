@@ -78,8 +78,6 @@ typedef enum {
 } type_t;
 
 #define NTYPES (Map + 1)
-#define TYPESIG(L, R) L*NTYPES+R
-#define CASE(L, R) case TYPESIG(L, R)
 
 union object;
 typedef union object *oop;

@@ -989,6 +989,9 @@ void runtimeError(char *msg)
     exit(1);
 }
 
+#define TYPESIG(L, R) L*NTYPES+R
+#define CASE(L, R) case TYPESIG(L, R)
+
 oop addOperation(oop ast, oop lhs, oop rhs)
 {
     switch (TYPESIG(getType(lhs), getType(rhs))) {
@@ -1019,6 +1022,9 @@ oop mulOperation(oop ast, oop lhs, oop rhs)
     runtimeError("multiplication between two incompatible types");
     assert(0);
 }
+
+#undef TYPESIG
+#undef CASE
 
 oop expandUnquotes(oop scope, oop obj)
 {
