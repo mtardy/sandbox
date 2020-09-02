@@ -1003,7 +1003,7 @@ oop addOperation(oop ast, oop lhs, oop rhs)
         }
     }
     runtimeError("addition between two incompatible types");
-    assert(0); // to prevent: control may reach end of non-void function
+    return NULL; // to prevent: control may reach end of non-void function
 }
 
 oop mulOperation(oop ast, oop lhs, oop rhs)
@@ -1020,7 +1020,7 @@ oop mulOperation(oop ast, oop lhs, oop rhs)
         }
     }
     runtimeError("multiplication between two incompatible types");
-    assert(0);
+    return NULL; // to prevent: control may reach end of non-void function
 }
 
 #undef TYPESIG
