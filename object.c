@@ -77,6 +77,8 @@ typedef enum {
     Map
 } type_t;
 
+#define NTYPES (Map + 1)
+
 union object;
 typedef union object *oop;
 

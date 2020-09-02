@@ -989,31 +989,42 @@ void runtimeError(char *msg)
     exit(1);
 }
 
+#define TYPESIG(L, R) L*NTYPES+R
+#define CASE(L, R) case TYPESIG(L, R)
+
 oop addOperation(oop ast, oop lhs, oop rhs)
 {
-    if (getType(lhs) == Integer && getType(rhs) == Integer) {
-        return makeInteger(getInteger(lhs) + getInteger(rhs));
-    } else if (getType(lhs) == String && getType(rhs) == String) {
-        return string_concat(lhs, rhs);
-    } else {
-        runtimeError("addition between two incompatible types");
-        assert(0); // to prevent: control may reach end of non-void function
+    switch (TYPESIG(getType(lhs), getType(rhs))) {
+        CASE(Integer, Integer): {
+            return makeInteger(getInteger(lhs) + getInteger(rhs));
+        }
+        CASE(String, String): {
+            return string_concat(lhs, rhs);
+        }
     }
+    runtimeError("addition between two incompatible types");
+    assert(0); // to prevent: control may reach end of non-void function
 }
 
 oop mulOperation(oop ast, oop lhs, oop rhs)
 {
-    if (getType(lhs) == Integer && getType(rhs) == Integer) {
-        return makeInteger(getInteger(lhs) * getInteger(rhs));
-    } else if (getType(lhs) == String && getType(rhs) == Integer) {
-        return string_mul(lhs, rhs);
-    } else if (getType(lhs) == Integer && getType(rhs) == String) {
-        return string_mul(rhs, lhs);
-    } else {
-        runtimeError("multiplication between two incompatible types");
-        assert(0);
+    switch (TYPESIG(getType(lhs), getType(rhs))) {
+        CASE(Integer, Integer): {
+            return makeInteger(getInteger(lhs) * getInteger(rhs));
+        }
+        CASE(String, Integer): {
+            return string_mul(lhs, rhs);
+        }
+        CASE(Integer, String): {
+            return string_mul(rhs, lhs);
+        }
     }
+    runtimeError("multiplication between two incompatible types");
+    assert(0);
 }
+
+#undef TYPESIG
+#undef CASE
 
 oop expandUnquotes(oop scope, oop obj)
 {
