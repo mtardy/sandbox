@@ -560,8 +560,6 @@ oop newTry(oop try, oop exception, oop catch, oop finally)
     return obj;
 }
 
-oop fold(oop ast);
-
 #define YY_INPUT(buf, result, max_size)                                 \
 {                                                                       \
     int yyc= feof(inputStack->file) ? EOF : getc(inputStack->file);     \
@@ -659,7 +657,7 @@ assignOp = ASSIGN                 { $$= null }
 
 switch  = SWITCH LPAREN e:exp RPAREN
           LCB statements:makeMap labels:makeMap
-              ( CASE    l:exp  COLON                         { map_set(labels, fold(l), makeInteger(map_size(statements))) }
+              ( CASE    l:exp  COLON                         { map_set(labels, eval(globals, l), makeInteger(map_size(statements))) }
               | DEFAULT        COLON                         { map_set(labels, __default___symbol, makeInteger(map_size(statements))) }
               |         s:stmt                               { map_append(statements, s) }
               )*
@@ -1042,82 +1040,6 @@ oop expandUnquotes(oop scope, oop obj)
         }
     }
     return obj;
-}
-
-oop fold(oop ast)
-{
-    if (is(Map, ast)) {
-    oop proto= map_get(ast, __proto___symbol);
-    if (null != proto) {
-        proto_t proto_number= get(map_get(proto, __name___symbol), Symbol, prototype);
-        switch (proto_number) {
-        case t_Integer:
-        case t_String:
-        case t_Symbol: {
-            return map_get(ast, value_symbol);
-        }
-        case t_Logor: {
-            oop lhs= map_get(ast, lhs_symbol);
-            oop rhs= map_get(ast, rhs_symbol);
-            if (isTrue(fold(lhs))) return makeInteger(1);
-            if (isTrue(fold(rhs))) return makeInteger(1);
-            return makeInteger(0);
-        }
-        case t_Logand: {
-            oop lhs= map_get(ast, lhs_symbol);
-            oop rhs= map_get(ast, rhs_symbol);
-            if (isFalse(fold(lhs))) return makeInteger(0);
-            if (isFalse(fold(rhs))) return makeInteger(0);
-            return makeInteger(1);
-        }
-#     define RELATION(NAME, OPERATOR)                                       \
-        case t_##NAME: {                                                    \
-            oop lhs= fold(map_get(ast, lhs_symbol));                        \
-            oop rhs= fold(map_get(ast, rhs_symbol));                        \
-            return makeInteger(oopcmp(lhs, rhs) OPERATOR 0);                \
-        }
-#     define BINARY(NAME, OPERATOR)                                         \
-        case t_##NAME: {                                                    \
-            oop lhs= fold(map_get(ast, lhs_symbol));                        \
-            oop rhs= fold(map_get(ast, rhs_symbol));                        \
-            return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
-        }
-        BINARY(Bitor,       | );
-        BINARY(Bitxor,      ^ );
-        BINARY(Bitand,      & );
-        RELATION(Equal,     ==);
-        RELATION(Noteq,     !=);
-        RELATION(Less,      < );
-        RELATION(Lesseq,    <=);
-        RELATION(Greatereq, >=);
-        RELATION(Greater,   > );
-        BINARY(Shleft,      <<);
-        BINARY(Shright,     >>);
-        BINARY(Add,         + );
-        BINARY(Sub,         - );
-        BINARY(Mul,         * );
-        BINARY(Div,         / );
-        BINARY(Mod,         % );
-#     undef BINARY
-#     undef RELATION
-#     define UNARY(NAME, OPERATOR)                          \
-        case t_##NAME: {                                    \
-            oop rhs = fold(map_get(ast, rhs_symbol));       \
-            return makeInteger(OPERATOR getInteger(rhs));   \
-        }
-        UNARY(Not, !);
-        UNARY(Neg, -);
-        UNARY(Com, ~);
-#     undef UNARY
-            default:
-                break;
-        }
-    }
-    }
-    printf("illegal value in constant expression: ");
-    println(ast);
-    assert(0);
-    return null;
 }
 
 oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
