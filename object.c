@@ -11,9 +11,11 @@
 # include <gc.h>
 #endif
 
-typedef long long int_t;
+typedef long long   int_t;
+typedef long double flt_t;
 
 #define FMT_I "%lli"
+#define FMT_F "%Lg"
 
 void *memcheck(void *ptr)
 {
@@ -71,6 +73,7 @@ char *xstrdup(char *s)
 typedef enum {
     Undefined,
     Integer,
+    Float,
     String,
     Symbol,
     Function,
@@ -89,6 +92,11 @@ struct Undefined {
 struct Integer {
     type_t type;
     int_t _value;
+};
+
+struct Float {
+    type_t type;
+    flt_t _value;
 };
 
 struct String {
@@ -142,6 +150,7 @@ union object {
     type_t type;
     struct Undefined Undefined;
     struct Integer Integer;
+    struct Float Float;
     struct String String;
     struct Symbol Symbol;
     struct Function Function;
@@ -170,7 +179,7 @@ int isInteger(oop obj)
 }
 
 #if (USE_TAG)
-# define getType(PTR) (((intptr_t)(PTR) & 1) ? Integer : (PTR)->type)
+# define getType(PTR) (type_t)(((intptr_t)(PTR) & 1) ? Integer : (PTR)->type)
 #else
 type_t getType(oop ptr)
 {
@@ -211,7 +220,7 @@ int_t getInteger(oop obj)
     if (isTag(obj)) return (intptr_t)obj >> 1;
 #endif
     if (!isInteger(obj)) {
-       fprintf(stderr, "\nNon-integer in arithmetic expression\n");
+        fprintf(stderr, "\ngetInteger call on non-integer\n");
         exit(1);
     }
     return get(obj, Integer, _value);
@@ -234,6 +243,14 @@ oop makeInteger(int_t value)
     newInt->type = Integer;
     newInt->Integer._value = value;
     return newInt;
+}
+
+oop makeFloat(flt_t value)
+{
+    oop newFloat= malloc(sizeof(struct Float));
+    newFloat->type= Float;
+    newFloat->Float._value= value;
+    return newFloat;
 }
 
 oop makeString(char *value)
@@ -328,20 +345,26 @@ int oopcmp(oop a, oop b)
     type_t ta = getType(a), tb = getType(b);
     if (ta == tb) {
         switch (getType(a)) {
-	    case Integer: {
-		int l= getInteger(a), r= getInteger(b);
-		if (l < r) return -1;
-		if (l > r) return  1;
-		return 0;
-	    }
-	    case String:
-		return strcmp(get(a, String, value), get(b, String, value));
-	    default: {
-		intptr_t l= (intptr_t)a, r= (intptr_t)b;
-		if (l < r) return -1;
-		if (l > r) return  1;
-		return 0;
-	    }
+            case Integer: {
+                int_t l= getInteger(a), r= getInteger(b);
+                if (l < r) return -1;
+                if (l > r) return  1;
+                return 0;
+            }
+            case Float: {
+                flt_t l= get(a, Float, _value), r= get(b, Float, _value);
+                if (l < r) return -1;
+                if (l > r) return  1;
+                return 0;
+            }
+            case String:
+                return strcmp(get(a, String, value), get(b, String, value));
+            default: {
+                intptr_t l= (intptr_t)a, r= (intptr_t)b;
+                if (l < r) return -1;
+                if (l > r) return  1;
+                return 0;
+            }
         }
     }
     return ta - tb;
@@ -573,8 +596,14 @@ void printOn(StringBuffer *buf, oop obj, int indent)
             return;
         }
         case Integer: {
-            char tmp[40];
+            char tmp[44];
             int length = snprintf(tmp, sizeof(tmp), FMT_I, getInteger(obj));
+            StringBuffer_appendAll(buf, tmp, length);
+            return;
+        }
+        case Float: {
+            char tmp[44];
+            int length = snprintf(tmp, sizeof(tmp), FMT_F, get(obj, Float, _value));
             StringBuffer_appendAll(buf, tmp, length);
             return;
         }

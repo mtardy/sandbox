@@ -7,11 +7,12 @@
  */
 
 #include <stdarg.h>
+#include <math.h>
 
 #define DO_PROTOS()                                                                                     \
     _DO(If) _DO(While) _DO(Do) _DO(For) _DO(ForIn) _DO(Switch) _DO(Call)                                \
     _DO(Invoke) _DO(Func) _DO(Block) _DO(Declaration) _DO(Assign)                                       \
-    _DO(Map) _DO(Symbol) _DO(Integer) _DO(String)                                                       \
+    _DO(Map) _DO(Symbol) _DO(Integer) _DO(Float) _DO(String)                                            \
     _DO(Logor) _DO(Logand) _DO(Bitor) _DO(Bitxor) _DO(Bitand)                                           \
     _DO(Equal) _DO(Noteq) _DO(Less) _DO(Lesseq) _DO(Greater) _DO(Greatereq) _DO(Shleft) _DO(Shright)    \
     _DO(Add) _DO(Sub) _DO(Mul) _DO(Div) _DO(Mod) _DO(Not) _DO(Neg) _DO(Com)                             \
@@ -294,6 +295,13 @@ oop newInteger(oop value)
     oop integer = newObject(Integer_proto);
     map_set(integer, value_symbol, value);
     return integer;
+}
+
+oop newFloat(oop value)
+{
+    oop obj = newObject(Float_proto);
+    map_set(obj, value_symbol, value);
+    return obj;
 }
 
 int digitValue(int c)
@@ -725,7 +733,7 @@ prod    =   l:prefix
             )*                          { $$ = l }
 
 prefix  =   PLUS       n:prefix         { $$= n }
-        |   MINUS      n:prefix         { $$= newUnary(Neg_proto, n) }
+        |   NEGATE     n:prefix         { $$= newUnary(Neg_proto, n) }
         |   TILDE      n:prefix         { $$= newUnary(Com_proto, n) }
         |   PLING      n:prefix         { $$= newUnary(Not_proto, n) }
         |   PLUSPLUS   n:prefix         { $$= newPreIncrement(n) }
@@ -756,7 +764,8 @@ argumentList = LPAREN  m:makeMap
                 ) ?
                 RPAREN              { $$ = m }
 
-value   =   n:NUMBER                { $$ = newInteger(n) }
+value   =   n:FLOAT                 { $$ = newFloat(n) }
+        |   n:INTEGER               { $$ = newInteger(n) }
         |   s:string                { $$ = newString(s) }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = newMap(m) }
@@ -789,7 +798,7 @@ map     =   LCB   m:makeMap
 
 makeMap = { $$ = makeMap() }
 
-key     = IDENT | NUMBER
+key     = IDENT | INTEGER
 
 -       =  (blank | comment)*
 
@@ -807,11 +816,15 @@ keyword = FUN | SYNTAX | VAR | SWITCH | CASE | DEFAULT | DO | FOR | IN | WHILE |
 
 IDENT   =    !keyword < [a-zA-Z_][a-zA-Z0-9_]* >   -   { $$ = intern(yytext) }
 
-NUMBER  =    '0b' < [01]+        >                 -   { $$ = makeInteger(strtol(yytext, 0,  2)) }
-        |    '0x' < [0-9a-fA-F]+ >                 -   { $$ = makeInteger(strtol(yytext, 0, 16)) }
-        |    '0'  < [0-7]+       >                 -   { $$ = makeInteger(strtol(yytext, 0,  8)) }
-        |         < [0-9]+       >                 -   { $$ = makeInteger(strtol(yytext, 0, 10)) }
-        |    SQUOTE < (!SQUOTE char)  > SQUOTE     -   { $$ = makeInteger(unescape(yytext)[0]) }
+INTEGER = '0b' < [01]+        >                 -   { $$ = makeInteger(strtol(yytext, 0,  2)) }
+        | '0x' < [0-9a-fA-F]+ >                 -   { $$ = makeInteger(strtol(yytext, 0, 16)) }
+        | '0'  < [0-7]+       >                 -   { $$ = makeInteger(strtol(yytext, 0,  8)) }
+        |      < [0-9]+       >                 -   { $$ = makeInteger(strtol(yytext, 0, 10)) }
+        | SQUOTE < (!SQUOTE char)  > SQUOTE     -   { $$ = makeInteger(unescape(yytext)[0]) }
+
+FLOAT   =      < [-+]* [0-9]+ '.' [0-9]* ('e'[-+]*[0-9]+)? > -   { $$ = makeFloat(strtold(yytext, 0)) }
+        |      < [-+]* [0-9]* '.' [0-9]+ ('e'[-+]*[0-9]+)? > -   { $$ = makeFloat(strtold(yytext, 0)) }
+        |      < [-+]* [0-9]+            ('e'[-+]*[0-9]+) >  -   { $$ = makeFloat(strtold(yytext, 0)) }
 
 FUN     =    'fun'      ![a-zA-Z0-9_] -
 SYNTAX  =    'syntax'   ![a-zA-Z0-9_] -
@@ -850,6 +863,7 @@ SHLEFT  =    '<<'       ![=]          -
 SHRIGHT =    '>>'       ![=]          -
 PLUS    =    '+'        ![+=]         -
 MINUS   =    '-'        ![-=]         -
+NEGATE  =    '-'        ![-=0-9.]     -
 PLUSPLUS =   '++'                     -
 MINUSMINUS = '--'                     -
 TILDE   =    '~'                      -
@@ -908,6 +922,7 @@ oop clone(oop obj)
     switch(getType(obj)) {
         case Undefined:
         case Integer:
+        case Float:
         case Function:
         case Symbol:
             return obj;
@@ -1005,34 +1020,64 @@ void runtimeError(char *fmt, ...)
 #define TYPESIG(L, R) L*NTYPES+R
 #define CASE(L, R) case TYPESIG(L, R)
 
-oop addOperation(oop ast, oop lhs, oop rhs)
+oop addOperation(oop lhs, oop rhs)
 {
     switch (TYPESIG(getType(lhs), getType(rhs))) {
-        CASE(Integer, Integer): {
-            return makeInteger(getInteger(lhs) + getInteger(rhs));
-        }
-        CASE(String, String): {
-            return string_concat(lhs, rhs);
-        }
+        CASE(Integer, Integer): return makeInteger(getInteger(lhs) + getInteger(rhs));
+        CASE(Integer, Float  ): return makeFloat(getInteger(lhs) + get(rhs, Float, _value));
+        CASE(Float  , Integer): return makeFloat(get(lhs, Float, _value) + getInteger(rhs));
+        CASE(Float  , Float  ): return makeFloat(get(lhs, Float, _value) + get(rhs, Float, _value));
+        CASE(String , String ): return string_concat(lhs, rhs);
     }
     runtimeError("addition between two incompatible types");
     return NULL; // to prevent: control may reach end of non-void function
 }
 
-oop mulOperation(oop ast, oop lhs, oop rhs)
+oop subOperation(oop lhs, oop rhs)
 {
     switch (TYPESIG(getType(lhs), getType(rhs))) {
-        CASE(Integer, Integer): {
-            return makeInteger(getInteger(lhs) * getInteger(rhs));
-        }
-        CASE(String, Integer): {
-            return string_mul(lhs, rhs);
-        }
-        CASE(Integer, String): {
-            return string_mul(rhs, lhs);
-        }
+        CASE(Integer, Integer): return makeInteger(getInteger(lhs) - getInteger(rhs));
+        CASE(Integer, Float  ): return makeFloat(getInteger(lhs) - get(rhs, Float, _value));
+        CASE(Float  , Integer): return makeFloat(get(lhs, Float, _value) - getInteger(rhs));
+        CASE(Float  , Float  ): return makeFloat(get(lhs, Float, _value) - get(rhs, Float, _value));
+    }
+    runtimeError("substraction between two incompatible types");
+    return NULL; // to prevent: control may reach end of non-void function
+}
+
+oop mulOperation(oop lhs, oop rhs)
+{
+    switch (TYPESIG(getType(lhs), getType(rhs))) {
+        CASE(Integer, Integer): return makeInteger(getInteger(lhs) * getInteger(rhs));
+        CASE(Integer, Float  ): return makeFloat(getInteger(lhs) * get(rhs, Float, _value));
+        CASE(Float  , Integer): return makeFloat(get(lhs, Float, _value) * getInteger(rhs));
+        CASE(Float  , Float  ): return makeFloat(get(lhs, Float, _value) * get(rhs, Float, _value));
+        CASE(String , Integer): return string_mul(lhs, rhs);
+        CASE(Integer, String ): return string_mul(rhs, lhs);
     }
     runtimeError("multiplication between two incompatible types");
+    return NULL; // to prevent: control may reach end of non-void function
+}
+
+oop divOperation(oop lhs, oop rhs)
+{
+    switch (TYPESIG(getType(lhs), getType(rhs))) {
+        CASE(Integer, Integer): return makeInteger(getInteger(lhs) / getInteger(rhs));
+        CASE(Integer, Float  ): return makeFloat(getInteger(lhs) / get(rhs, Float, _value));
+        CASE(Float  , Integer): return makeFloat(get(lhs, Float, _value) / getInteger(rhs));
+        CASE(Float  , Float  ): return makeFloat(get(lhs, Float, _value) / get(rhs, Float, _value));
+    }
+    runtimeError("division between two incompatible types");
+    return NULL; // to prevent: control may reach end of non-void function
+}
+
+oop modOperation(oop lhs, oop rhs)
+{
+    switch (TYPESIG(getType(lhs), getType(rhs))) {
+        CASE(Integer, Integer): return makeInteger(getInteger(lhs) % getInteger(rhs));
+        CASE(Float  , Float  ): return makeFloat(fmodl(get(lhs, Float, _value), get(rhs, Float, _value)));
+    }
+    runtimeError("modulo between two incompatible types");
     return NULL; // to prevent: control may reach end of non-void function
 }
 
@@ -1061,11 +1106,11 @@ oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
 {
     if (null != op) {                                                           assert(is(Symbol, op));
         switch (get(op, Symbol, prototype)) {
-            case t_Add:     return addOperation(ast, lhs, rhs);
-            case t_Sub:     return makeInteger(getInteger(lhs)  - getInteger(rhs));
-            case t_Mul:     return mulOperation(ast, lhs, rhs);
-            case t_Div:     return makeInteger(getInteger(lhs)  / getInteger(rhs));
-            case t_Mod:     return makeInteger(getInteger(lhs)  % getInteger(rhs));
+            case t_Add:     return addOperation(lhs, rhs);
+            case t_Sub:     return subOperation(lhs, rhs);
+            case t_Mul:     return mulOperation(lhs, rhs);
+            case t_Div:     return divOperation(lhs, rhs);
+            case t_Mod:     return modOperation(lhs, rhs);
             case t_Bitor:   return makeInteger(getInteger(lhs)  | getInteger(rhs));
             case t_Bitxor:  return makeInteger(getInteger(lhs)  ^ getInteger(rhs));
             case t_Bitand:  return makeInteger(getInteger(lhs)  & getInteger(rhs));
@@ -1170,15 +1215,16 @@ oop eval(oop scope, oop ast)
     }
 
     switch(getType(ast)) {
-    case Undefined:
-    case Integer:
-    case String:
-    case Function:
-        return ast;
-    case Symbol:
-        return getVariable(scope, ast);
-    case Map:
-        break;
+        case Undefined:
+        case Integer:
+        case Float:
+        case String:
+        case Function:
+            return ast;
+        case Symbol:
+            return getVariable(scope, ast);
+        case Map:
+            break;
     }
 
     assert(is(Map, ast));
@@ -1591,6 +1637,7 @@ oop eval(oop scope, oop ast)
     }
     case t_Symbol:
     case t_Integer:
+    case t_Float:
     case t_String: {
         return map_get(ast, value_symbol);
     }
@@ -1620,6 +1667,12 @@ oop eval(oop scope, oop ast)
         oop rhs = eval(scope, map_get(ast, rhs_symbol));                \
         return makeInteger(getInteger(lhs) OPERATOR getInteger(rhs));   \
     }
+# define BINARYOP(NAME, FUNCPREFIX)                                     \
+    case t_##NAME: {                                                    \
+        oop lhs = eval(scope, map_get(ast, lhs_symbol));                \
+        oop rhs = eval(scope, map_get(ast, rhs_symbol));                \
+        return FUNCPREFIX##Operation(lhs, rhs);                         \
+    }
     BINARY(Bitor,       | );
     BINARY(Bitxor,      ^ );
     BINARY(Bitand,      & );
@@ -1631,21 +1684,12 @@ oop eval(oop scope, oop ast)
     RELATION(Greater,   > );
     BINARY(Shleft,      <<);
     BINARY(Shright,     >>);
-//  BINARY(Add,       + );
-    case t_Add: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        return addOperation(ast, lhs, rhs);
-    }
-    BINARY(Sub,       - );
-//  BINARY(Mul,       * );
-    case t_Mul: {
-        oop lhs = eval(scope, map_get(ast, lhs_symbol));
-        oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        return mulOperation(ast, lhs, rhs);
-    }
-    BINARY(Div,       / );
-    BINARY(Mod,       % );
+    BINARYOP(Add,      add);
+    BINARYOP(Mul,      mul);
+    BINARYOP(Sub,      sub);
+    BINARYOP(Div,      div);
+    BINARYOP(Mod,      mod);
+# undef BINARYOP
 # undef BINARY
 # undef RELATION
     case t_Not: {
