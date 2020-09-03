@@ -1102,7 +1102,7 @@ oop expandUnquotes(oop scope, oop obj)
     return obj;
 }
 
-oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
+oop applyOperator(oop op, oop lhs, oop rhs)
 {
     if (null != op) {                                                           assert(is(Symbol, op));
         switch (get(op, Symbol, prototype)) {
@@ -1453,7 +1453,7 @@ oop eval(oop scope, oop ast)
         oop lhs = map_get(ast, lhs_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop rhs = eval(scope, map_get(ast, rhs_symbol));
-        if (null != op) rhs= applyOperator(ast, op, getVariable(scope, lhs), rhs);
+        if (null != op) rhs= applyOperator(op, getVariable(scope, lhs), rhs);
         setVariable(scope, lhs, rhs);
         if (is(Function, rhs) && null == get(rhs, Function, name)) {
             set(rhs, Function, name, lhs);
@@ -1594,7 +1594,7 @@ oop eval(oop scope, oop ast)
         oop key = map_get(ast, key_symbol);
         oop op  = map_get(ast, operator_symbol);
         oop value = eval(scope, map_get(ast, value_symbol));
-        if (null != op) value= applyOperator(ast, op, getProperty(map, key), value);
+        if (null != op) value= applyOperator(op, getProperty(map, key), value);
         if (is(Function, value) && null == get(value, Function, name)) {
             set(value, Function, name, key);
         }
@@ -1628,7 +1628,7 @@ oop eval(oop scope, oop ast)
                 get(map, String, value)[getInteger(key)] = getInteger(value);
                 return value;
             case Map:
-                if (null != op) value= applyOperator(ast, op, map_get(map, key), value);
+                if (null != op) value= applyOperator(op, map_get(map, key), value);
                 return map_set(map, key, value);
             default:
                 runtimeError("SetIndex on non Map or String");
