@@ -1948,8 +1948,39 @@ oop prim_import(oop scope, oop params)
 
 oop prim_String(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
-    return makeString(printString(get(params, Map, elements)[0].value));
+    if (!map_hasIntegerKey(params, 0)) return makeString("");
+    oop arg= get(params, Map, elements)[0].value;
+    switch (getType(arg)) {
+        case Undefined: {
+            return makeString("");
+        }
+        case Integer: {
+            int repeat= getInteger(arg);
+            if (!map_hasIntegerKey(params, 1)) {
+                // I put 0 otherwise '\0' won't be printed and can't be seen
+                return makeStringFromChar('0', repeat);
+            }
+            char c= getInteger(get(params, Map, elements)[1].value);
+            return makeStringFromChar(c, repeat);
+        }
+        case String: {
+            return clone(arg);
+        }
+        case Map: {
+            if (map_isArray(arg)) {
+                size_t len= map_size(arg);
+                char *str= malloc(sizeof(char) * len + 1);
+                for (size_t i=0; i < len; ++i) {
+                    str[i]= getInteger(get(arg, Map, elements)[i].value);
+                }
+                return makeStringFrom(str, len);
+            }
+        }
+        case Symbol: {
+            return makeString(get(arg, Symbol, name));
+        }
+    }
+    return null;
 }
 
 oop prim_Integer(oop scope, oop params)

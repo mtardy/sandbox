@@ -249,11 +249,21 @@ oop makeString(char *value)
 // value will be used directly
 oop makeStringFrom(char *value, size_t l)
 {
-    oop newString = memcheck(malloc(sizeof(union object)));
+    oop newString = malloc(sizeof(union object));
     newString->type = String;
     newString->String.value = value;
     newString->String.size = l;
     return newString;
+}
+
+oop makeStringFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeStringFrom(str, repeat);
 }
 
 size_t string_size(oop s)
