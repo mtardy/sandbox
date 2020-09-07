@@ -236,6 +236,7 @@ oop makeInteger(int_t value)
     return newInt;
 }
 
+// value will be copied
 oop makeString(char *value)
 {
     oop newString = malloc(sizeof(struct String));
@@ -245,9 +246,35 @@ oop makeString(char *value)
     return newString;
 }
 
+// value will be used directly
+oop makeStringFrom(char *value, size_t l)
+{
+    oop newString = memcheck(malloc(sizeof(union object)));
+    newString->type = String;
+    newString->String.value = value;
+    newString->String.size = l;
+    return newString;
+}
+
 size_t string_size(oop s)
 {
     return get(s, String, size);
+}
+
+oop string_slice(oop str, ssize_t start, ssize_t stop) {
+    assert(is(String, str));
+    size_t len = string_size(str);
+    if (start < 0) start= start + len; 
+    if (stop  < 0) stop= stop + len;
+    if (start < 0 || start > len) return NULL;
+    if (stop  < 0 || stop  > len) return NULL;
+    if (start > stop) return NULL;
+
+    size_t cpylen = stop - start;
+    char *slice= memcheck(malloc(sizeof(char) * (cpylen + 1)));
+    memcpy(slice, get(str, String, value) + start, cpylen);
+    slice[cpylen]= '\0';
+    return makeStringFrom(slice, cpylen);
 }
 
 oop string_concat(oop str1, oop str2)
@@ -257,11 +284,7 @@ oop string_concat(oop str1, oop str2)
     memcpy(concat, get(str1, String, value), string_size(str1));
     memcpy(concat + string_size(str1), get(str2, String, value), string_size(str2));
     concat[len]= '\0';
-    oop newString = malloc(sizeof(struct String));
-    newString->type = String;
-    newString->String.value = concat;
-    newString->String.size = len;
-    return newString;
+    return makeStringFrom(concat, len);
 }
 
 oop string_mul(oop str, oop factor)
@@ -273,11 +296,7 @@ oop string_mul(oop str, oop factor)
         memcpy(concat + (i * string_size(str)), get(str, String, value), string_size(str));
     }
     concat[len]= '\0';
-    oop newString = malloc(sizeof(struct String));
-    newString->type = String;
-    newString->String.value = concat;
-    newString->String.size = len;
-    return newString;
+    return makeStringFrom(concat, len);
 }
 
 oop makeSymbol(char *name)
@@ -496,6 +515,26 @@ oop map_values(oop map)
         }
     }
     return values;
+}
+
+oop map_slice(oop map, ssize_t start, ssize_t stop) {
+    assert(is(Map, map));
+    size_t len = map_size(map);
+    if (start < 0) start= start + len; 
+    if (stop  < 0) stop= stop + len;
+    if (start < 0 || start > len) return NULL;
+    if (stop  < 0 || stop  > len) return NULL;
+    if (start > stop) return NULL;
+
+    oop slice= makeMap();
+    if (start < stop) {
+        if (!map_hasIntegerKey(map, start   )) return NULL;
+        if (!map_hasIntegerKey(map, stop - 1)) return NULL;
+        for (size_t i= start; i < stop; ++i) {
+            map_append(slice, get(map, Map, elements)[i].value);
+        }
+    }
+    return slice;
 }
 
 DECLARE_BUFFER(oop, OopStack);
