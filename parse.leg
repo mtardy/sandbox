@@ -1906,16 +1906,17 @@ oop prim_Integer(oop scope, oop params)
             return makeInteger(0);
         }
         case Integer: {
-            // does it make sense to copy an integer?
-            // return arg;
-            return makeInteger(getInteger(arg));
+            return arg;
         }
         case String: {
-            return makeInteger(strtoll(get(arg, String, value), NULL, 10));
-        }
-        case Symbol: {
-            // since symbol are ident, they cannot start with a number so it's impossible that strtoll succeed
-            return makeInteger(strtoll(get(arg, Symbol, name), NULL, 10));
+            if (!map_hasIntegerKey(params, 1)) {
+                return makeInteger(strtoll(get(arg, String, value), NULL, 0));
+            }
+            int base= getInteger(get(params, Map, elements)[1].value);
+            if (base > 36 || base < 2) {
+                runtimeError("base must be between 2 and 36 inclusive");
+            }
+            return makeInteger(strtoll(get(arg, String, value), NULL, base));
         }
     }
     return null;
