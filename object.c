@@ -323,6 +323,14 @@ bool map_hasIntegerKey(oop map, size_t index)
     return index == getInteger(key);
 }
 
+bool map_isArray(oop map)
+{
+    assert(is(Map, map));
+    size_t size= map_size(map);
+    if (size == 0) return true;
+    return map_hasIntegerKey(map, 0) && map_hasIntegerKey(map, size-1);
+}
+
 int oopcmp(oop a, oop b)
 {
     type_t ta = getType(a), tb = getType(b);
