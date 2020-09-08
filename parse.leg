@@ -922,7 +922,6 @@ oop clone(oop obj)
     switch(getType(obj)) {
         case Undefined:
         case Integer:
-        case Function:
         case Symbol:
             return obj;
         case String:
@@ -934,6 +933,12 @@ oop clone(oop obj)
             memcpy(map, obj, sizeof(*obj));
             set(map, Map, elements, elements);
             return map;
+        }
+        case Function: {
+            oop fun= malloc(sizeof(*obj));
+            memcpy(fun, obj, sizeof(*obj));
+            // shall we deepclone?
+            return fun;
         }
     }
     return obj;
@@ -2093,6 +2098,66 @@ oop prim_Array(oop scope, oop params)
     return null;
 }
 
+oop prim_Function(oop scope, oop params)
+{
+    if (!map_hasIntegerKey(params, 0)) return null;
+    oop arg= get(params, Map, elements)[0].value;
+    switch (getType(arg)) {
+        case Function: {
+            if (isTrue(get(arg, Function, fixed))) {
+                oop unfix= clone(arg);
+                set(unfix, Function, fixed, makeInteger(0));
+                return unfix;
+            } else {
+                return clone(arg);
+            }
+        }
+        case Map: {
+            if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
+                oop param= arg;
+                oop body= get(params, Map, elements)[1].value;
+                oop parentScope= get(params, Map, elements)[2].value;
+                oop name= get(params, Map, elements)[3].value;
+                if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
+                    return makeFunction(NULL, name, param, body, parentScope, makeInteger(0));
+                }
+                // runtime error
+            }
+        }
+    }
+    return null;
+}
+
+oop prim_Syntax(oop scope, oop params)
+{
+    if (!map_hasIntegerKey(params, 0)) return null;
+    oop arg= get(params, Map, elements)[0].value;
+    switch (getType(arg)) {
+        case Function: {
+            if (isFalse(get(arg, Function, fixed))) {
+                oop fix= clone(arg);
+                set(fix, Function, fixed, makeInteger(1));
+                return fix;
+            } else {
+                return clone(arg);
+            }
+        }
+        case Map: {
+            if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
+                oop param= arg;
+                oop body= get(params, Map, elements)[1].value;
+                oop parentScope= get(params, Map, elements)[2].value;
+                oop name= get(params, Map, elements)[3].value;
+                if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
+                    return makeFunction(NULL, name, param, body, parentScope, makeInteger(1));
+                }
+                // runtime error
+            }
+        }
+    }
+    return null;
+}
+
 oop prim_scope(oop scope, oop params)
 {
     return fixScope(scope);
@@ -2131,6 +2196,8 @@ int main(int argc, char **argv)
     map_set(globals, intern("Symbol"      ), makeFunction(prim_Symbol      , intern("Symbol"      ), null, null, globals, null));
     map_set(globals, intern("Map"         ), makeFunction(prim_Map         , intern("Map"         ), null, null, globals, null));
     map_set(globals, intern("Array"       ), makeFunction(prim_Array       , intern("Array"       ), null, null, globals, null));
+    map_set(globals, intern("Function"    ), makeFunction(prim_Function    , intern("Function"    ), null, null, globals, null));
+    map_set(globals, intern("Syntax"      ), makeFunction(prim_Syntax      , intern("Syntax"      ), null, null, globals, null));
 
     map_set(globals, intern("scope"), makeFunction(prim_scope, intern("scope"), null, null, globals, null));
 
