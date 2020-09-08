@@ -2062,6 +2062,37 @@ oop prim_Map(oop scope, oop params)
     return null;
 }
 
+oop prim_Array(oop scope, oop params)
+{
+    if (!map_hasIntegerKey(params, 0)) return makeMap();
+    oop arg= get(params, Map, elements)[0].value;
+    switch (getType(arg)) {
+        case Undefined: {
+            return makeMap();
+        }
+        case Integer: {
+            int repeat= getInteger(arg);
+            oop array= NULL;
+            if (map_hasIntegerKey(params, 1)) {
+                array= makeArrayFromElement(get(params, Map, elements)[1].value, repeat);
+            } else {
+                array= makeArrayFromElement(null, repeat);
+            }
+            return array;
+        }
+        case Symbol: {
+            return makeArrayFromString(get(arg, Symbol, name));
+        }
+        case String: {
+            return makeArrayFromString(get(arg, String, value));
+        }
+        case Map: {
+            return clone(arg);
+        }
+    }
+    return null;
+}
+
 oop prim_scope(oop scope, oop params)
 {
     return fixScope(scope);
@@ -2097,8 +2128,9 @@ int main(int argc, char **argv)
     map_set(globals, intern("microseconds"), makeFunction(prim_microseconds, intern("microseconds"), null, null, globals, null));
     map_set(globals, intern("String"      ), makeFunction(prim_String      , intern("String"      ), null, null, globals, null));
     map_set(globals, intern("Integer"     ), makeFunction(prim_Integer     , intern("Integer"     ), null, null, globals, null));
-    map_set(globals, intern("Map"         ), makeFunction(prim_Map         , intern("Map"         ), null, null, globals, null));
     map_set(globals, intern("Symbol"      ), makeFunction(prim_Symbol      , intern("Symbol"      ), null, null, globals, null));
+    map_set(globals, intern("Map"         ), makeFunction(prim_Map         , intern("Map"         ), null, null, globals, null));
+    map_set(globals, intern("Array"       ), makeFunction(prim_Array       , intern("Array"       ), null, null, globals, null));
 
     map_set(globals, intern("scope"), makeFunction(prim_scope, intern("scope"), null, null, globals, null));
 

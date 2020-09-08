@@ -518,6 +518,25 @@ oop map_append(oop map, oop value)
     return map_set(map, makeInteger(map_size(map)), value);
 }
 
+oop makeArrayFromElement(oop elem, int repeat)
+{
+    oop array= makeMapCapacity(repeat);
+    for(int i=0; i < repeat; ++i) {
+        map_append(array, elem);
+    }
+    return array;
+}
+
+oop makeArrayFromString(char *str)
+{
+    size_t len= strlen(str);
+    oop array= makeMapCapacity(len);
+    for(int i=0; i < len; ++i) {
+        map_append(array, makeInteger(str[i]));
+    }
+    return array;
+}
+
 bool isHidden(oop obj) {
     if (is(Symbol, obj)) {
         char *s = get(obj, Symbol, name);
