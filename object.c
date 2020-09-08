@@ -581,6 +581,16 @@ oop map_values(oop map)
     return values;
 }
 
+oop map_allValues(oop map)
+{
+    assert(is(Map, map));
+    oop values = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+	map_append(values, get(map, Map, elements)[i].value);
+    }
+    return values;
+}
+
 oop map_slice(oop map, ssize_t start, ssize_t stop) {
     assert(is(Map, map));
     size_t len = map_size(map);

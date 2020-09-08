@@ -21,7 +21,7 @@
     _DO(PostDecVariable) _DO(PostDecMember) _DO(PostDecIndex)                                           \
     _DO(GetVariable) _DO(GetMember) _DO(SetMember) _DO(GetIndex) _DO(SetIndex) _DO(Slice)               \
     _DO(Return) _DO(Break) _DO(Continue) _DO(Throw) _DO(Try)                                            \
-    _DO(Quasiquote) _DO(Unquote) _DO(Splice)
+    _DO(Quasiquote) _DO(Unquote) _DO(Unsplice) _DO(Splice)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -652,7 +652,7 @@ exp     =   VAR l:ident                        ASSIGN e:exp  { $$ = newDeclarati
         |   c:cond                                           { $$ = c }
 
 ident   =   l:IDENT                                          { $$ = l }
-        |   AT         n:prefix                              { $$ = newUnary(Unquote_proto, n) }
+        |   AT         n:value                               { $$ = newUnary(Unquote_proto, n) }
 
 syntax2  = < [a-zA-Z_][a-zA-Z0-9_]* >
            &{ null != getSyntaxId(2, intern(yytext)) }   -   { $$ = getSyntaxId(2, intern(yytext)) }
@@ -740,8 +740,6 @@ prefix  =   PLUS       n:prefix         { $$= n }
         |   PLING      n:prefix         { $$= newUnary(Not_proto, n) }
         |   PLUSPLUS   n:prefix         { $$= newPreIncrement(n) }
         |   MINUSMINUS n:prefix         { $$= newPreDecrement(n) }
-        |   BACKTICK   n:prefix         { $$ = newUnary(Quasiquote_proto, n) }
-        |   AT         n:prefix         { $$ = newUnary(Unquote_proto, n) }
         |              n:postfix        { $$= n }
 
 postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(i, s, a) }
@@ -757,11 +755,14 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(
                     ) *                                         { $$ = i }
 
 paramList    = LPAREN  m:makeMap
-                (       i:ident     { map_append(m, i) }
-                ( COMMA i:ident     { map_append(m, i) }
+                ( p:parameter       { map_append(m, p) }
+                ( COMMA p:parameter { map_append(m, p) }
                 ) *
                 ) ?
                 RPAREN              { $$ = m }
+
+parameter    =  ATAT p:value        { $$ = newUnary(Unsplice_proto, p) }
+	         |       p:ident        { $$ = p }
 
 argumentList = LPAREN  m:makeMap
                 (       a:argument  { map_append(m, a) }
@@ -770,10 +771,13 @@ argumentList = LPAREN  m:makeMap
                 ) ?
                 RPAREN              { $$ = m }
 
-argument = MULTI e:exp              { $$ = newUnary(Splice_proto, e) }
-	 |       e:exp              { $$ = e }
+argument    = ATAT  e:value         { $$ = newUnary(Unsplice_proto, e) }
+            | MULTI e:exp           { $$ = newUnary(Splice_proto, e) }
+	        |       e:exp           { $$ = e }
 
-value   =   n:NUMBER                { $$ = newInteger(n) }
+value   =   BACKTICK   n:value      { $$ = newUnary(Quasiquote_proto, n) }
+        |   AT         n:value      { $$ = newUnary(Unquote_proto, n) }
+        |   n:NUMBER                { $$ = newInteger(n) }
         |   s:string                { $$ = newString(s) }
         |   s:symbol                { $$ = s }
         |   m:map                   { $$ = newMap(m) }
@@ -798,15 +802,15 @@ map     =   LCB   m:makeMap
             ) ?
             RCB                                 { $$ = m }
         |   LBRAC m:makeMap
-            (                         v:exp     { map_append(m, v) }
-            (     COMMA               v:exp     { map_append(m, v) }
+            (                       v:argument  { map_append(m, v) }
+            (     COMMA             v:argument  { map_append(m, v) }
             ) *
             ) ?
-        RBRAC                               { $$ = m }
+        RBRAC                                   { $$ = m }
 
 makeMap = { $$ = makeMap() }
 
-key     = IDENT | NUMBER
+key     = ident | NUMBER
 
 -       =  (blank | comment)*
 
@@ -891,7 +895,8 @@ SEMICOLON =  ';'                      -
 COMMA   =    ','                      -
 DOT     =    '.'                      -
 BACKTICK=    '`'                      -
-AT      =    '@'                      -
+AT      =    '@'        ![@]          -
+ATAT    =    '@@'       ![@]          -
 LCB     =    '{'                      -
 RCB     =    '}'                      -
 LBRAC   =    '['                      -
@@ -1060,22 +1065,52 @@ oop mulOperation(oop ast, oop lhs, oop rhs)
 #undef TYPESIG
 #undef CASE
 
-oop expandUnquotes(oop scope, oop obj)
+oop expandUnquotes(oop scope, oop ast)
 {
-    obj = clone(obj);
-    if (!is(Map, obj)) {
-        return obj;
+    if (!is(Map, ast)) return clone(ast);
+
+    if (Unquote_proto  == map_get(ast, __proto___symbol)) return eval(scope, map_get(ast, rhs_symbol));
+    if (Unsplice_proto == map_get(ast, __proto___symbol)) runtimeError("@@ outside of array expression");
+
+    oop map= makeMap();
+    if (map_isArray(ast)) {
+	for (size_t i= 0;  i < map_size(ast);  ++i) {
+	    struct Pair *pair= &get(ast, Map, elements)[i];
+	    if (!is(Map, pair->value)) {
+		map_append(map, clone(pair->value));
+		continue;
+	    }
+	    oop proto= map_get(pair->value, __proto___symbol);
+	    if (Unquote_proto  == proto) {
+		map_append(map, eval(scope, map_get(pair->value, rhs_symbol)));
+		continue;
+	    }
+	    if (Unsplice_proto == proto) {
+		oop sub= eval(scope, map_get(pair->value, rhs_symbol));
+		if (is(Map, sub) && (Map_proto == map_get(sub, __proto___symbol))) sub= map_get(sub, value_symbol);
+		if (!map_isArray(sub)) runtimeError("cannot splice non-array: %s", printString(sub));
+		for (size_t j= 0;  j < map_size(sub);  ++j)
+		    map_append(map, get(sub, Map, elements)[j].value);
+		continue;
+	    }
+	    map_append(map, expandUnquotes(scope, pair->value));
+	}
     }
-    if (map_get(obj, __proto___symbol) == Unquote_proto) {
-        return eval(scope, map_get(obj, rhs_symbol));
+    else {
+	for (size_t i= 0;  i < map_size(ast);  ++i) {
+	    struct Pair *pair= &get(ast, Map, elements)[i];
+	    oop key= expandUnquotes(scope, pair->key);
+	    if (!is(Map, pair->value)) {
+		map_set(map, key, clone(pair->value));
+		continue;
+	    }
+	    if (__proto___symbol == key)
+		map_set(map, key, pair->value);
+	    else
+		map_set(map, key, expandUnquotes(scope, pair->value));
+	}
     }
-    for (size_t i= 0;  i < map_size(obj);  ++i) {
-        struct Pair *pair= &get(obj, Map, elements)[i];
-        if (__proto___symbol != pair->key) {
-            pair->value= expandUnquotes(scope, pair->value);
-        }
-    }
-    return obj;
+    return map;
 }
 
 oop applyOperator(oop ast, oop op, oop lhs, oop rhs)
@@ -1231,6 +1266,9 @@ oop eval(oop scope, oop ast)
     }
     case t_Unquote: {
         runtimeError("@ outside of `");
+    }
+    case t_Unsplice: {
+        runtimeError("@@ outside of `");
     }
     case t_Declaration: {
         oop lhs = map_get(ast, lhs_symbol);
@@ -1837,11 +1875,29 @@ oop prim_keys(oop scope, oop params)
     return null;
 }
 
+oop prim_allKeys(oop scope, oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+	oop arg= get(params, Map, elements)[0].value;
+	if (is(Map, arg)) return map_allKeys(arg);
+    }
+    return null;
+}
+
 oop prim_values(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
-    oop arg= get(params, Map, elements)[0].value;
-    if (is(Map, arg)) return map_values(arg);
+	oop arg= get(params, Map, elements)[0].value;
+	if (is(Map, arg)) return map_values(arg);
+    }
+    return null;
+}
+
+oop prim_allValues(oop scope, oop params)
+{
+    if (map_hasIntegerKey(params, 0)) {
+	oop arg= get(params, Map, elements)[0].value;
+	if (is(Map, arg)) return map_allValues(arg);
     }
     return null;
 }
@@ -2208,7 +2264,9 @@ int main(int argc, char **argv)
 
     map_set(globals, intern("exit"        ), makeFunction(prim_exit,         intern("exit"        ), null, null, globals, null));
     map_set(globals, intern("keys"        ), makeFunction(prim_keys,         intern("keys"        ), null, null, globals, null));
+    map_set(globals, intern("allKeys"     ), makeFunction(prim_allKeys,      intern("allKeys"     ), null, null, globals, null));
     map_set(globals, intern("values"      ), makeFunction(prim_values,       intern("values"      ), null, null, globals, null));
+    map_set(globals, intern("allValues"   ), makeFunction(prim_allValues,    intern("allValues"   ), null, null, globals, null));
     map_set(globals, intern("length"      ), makeFunction(prim_length,       intern("length"      ), null, null, globals, null));
     map_set(globals, intern("print"       ), makeFunction(prim_print,        intern("print"       ), null, null, globals, null));
     map_set(globals, intern("invoke"      ), makeFunction(prim_invoke,       intern("invoke"      ), null, null, globals, null));
