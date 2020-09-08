@@ -21,7 +21,7 @@
     _DO(PostDecVariable) _DO(PostDecMember) _DO(PostDecIndex)                                           \
     _DO(GetVariable) _DO(GetMember) _DO(SetMember) _DO(GetIndex) _DO(SetIndex)                          \
     _DO(Return) _DO(Break) _DO(Continue) _DO(Throw) _DO(Try)                                            \
-    _DO(Quasiquote) _DO(Unquote)
+    _DO(Quasiquote) _DO(Unquote) _DO(Splice)
 
 typedef enum {
 t_UNDEFINED=0,
@@ -743,18 +743,21 @@ postfix =   i:value ( DOT    s:IDENT        a:argumentList      { i = newInvoke(
                     ) *                                         { $$ = i }
 
 paramList    = LPAREN  m:makeMap
-                ( i:IDENT           { map_append(m, i) }
-                ( COMMA i:IDENT     { map_append(m, i) }
+                (       i:ident     { map_append(m, i) }
+                ( COMMA i:ident     { map_append(m, i) }
                 ) *
                 ) ?
                 RPAREN              { $$ = m }
 
 argumentList = LPAREN  m:makeMap
-                ( e:exp             { map_append(m, e) }
-                ( COMMA e:exp       { map_append(m, e) }
+                (       a:argument  { map_append(m, a) }
+                ( COMMA a:argument  { map_append(m, a) }
                 ) *
                 ) ?
                 RPAREN              { $$ = m }
+
+argument = MULTI e:exp              { $$ = newUnary(Splice_proto, e) }
+	 |       e:exp              { $$ = e }
 
 value   =   n:NUMBER                { $$ = newInteger(n) }
         |   s:string                { $$ = newString(s) }
@@ -1457,6 +1460,9 @@ oop eval(oop scope, oop ast)
         }
         return apply(scope, this, func, args, ast);
     }
+    case t_Splice: {
+        runtimeError("* outside of argument list");
+    }
 
     case t_Return: {
         assert(jbs);
@@ -1824,16 +1830,27 @@ oop prim_print(oop scope, oop params)
     return params;
 }
 
-oop evalArgs(oop scope, oop args)
+oop evalArgs(oop scope, oop asts)
 {
-   int i = 0;
-   oop params = makeMap();
-   oop index;
-   while ((index = makeInteger(i)), map_hasKey(args, index)) {
-       map_set(params, index, eval(scope, map_get(args, index)));
-       i++;
-   }
-   return params;
+    oop    args=  makeMap();
+    size_t nargs= map_size(asts);
+    for (size_t i= 0;  i < nargs;  ++i) {
+	oop ast= get(asts, Map, elements)[i].value;
+	if (is(Map, ast) && (Splice_proto == map_get(ast, __proto___symbol))) {
+	    oop splice= eval(scope, map_get(ast, rhs_symbol));
+	    if (!is(Map, splice)) map_append(args, splice);
+	    else {
+		size_t nsplice= map_size(splice);
+		for (size_t j= 0;  j < nsplice;  ++j) {
+		    map_append(args, get(splice, Map, elements)[j].value);
+		}
+	    }
+	}
+	else {
+	    map_append(args, eval(scope, ast));
+	}
+    }
+    return args;
 }
 
 oop AST= NULL;
