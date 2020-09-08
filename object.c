@@ -188,7 +188,7 @@ oop _checkType(oop ptr, type_t type, char *file, int line)
 {
     assert(ptr);
     if (getType(ptr) != type) {
-        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, ptr->type);
+        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, getType(ptr));
     }
     assert(getType(ptr) == type);
     return ptr;
@@ -249,11 +249,21 @@ oop makeString(char *value)
 // value will be used directly
 oop makeStringFrom(char *value, size_t l)
 {
-    oop newString = memcheck(malloc(sizeof(union object)));
+    oop newString = malloc(sizeof(struct String));
     newString->type = String;
     newString->String.value = value;
     newString->String.size = l;
     return newString;
+}
+
+oop makeStringFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeStringFrom(str, repeat);
 }
 
 size_t string_size(oop s)
@@ -308,6 +318,25 @@ oop makeSymbol(char *name)
     return newSymb;
 }
 
+oop makeSymbolFrom(char *name)
+{
+    oop newSymbol= malloc(sizeof(struct Symbol));
+    newSymbol->type= Symbol;
+    newSymbol->Symbol.name= name;
+    newSymbol->Symbol.prototype= 0;
+    return newSymbol;
+}
+
+oop makeSymbolFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeSymbolFrom(str);
+}
+
 oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
 {
     oop newFunc = malloc(sizeof(struct Function));
@@ -328,6 +357,14 @@ oop makeMap()
     return newMap;
 }
 
+oop makeMapCapacity(size_t capa)
+{
+    oop map= makeMap();
+    set(map, Map, elements, malloc(sizeof(struct Pair) * capa));
+    set(map, Map, capacity, capa);
+    return map;
+}
+
 size_t map_size(oop map)
 {
     assert(is(Map, map));
@@ -340,6 +377,14 @@ bool map_hasIntegerKey(oop map, size_t index)
     oop key= get(map, Map, elements)[index].key;
     if (!isInteger(key)) return 0;
     return index == getInteger(key);
+}
+
+bool map_isArray(oop map)
+{
+    assert(is(Map, map));
+    size_t size= map_size(map);
+    if (size == 0) return true;
+    return map_hasIntegerKey(map, 0) && map_hasIntegerKey(map, size-1);
 }
 
 int oopcmp(oop a, oop b)
@@ -471,6 +516,25 @@ oop map_del(oop map, oop key)
 oop map_append(oop map, oop value)
 {
     return map_set(map, makeInteger(map_size(map)), value);
+}
+
+oop makeArrayFromElement(oop elem, int repeat)
+{
+    oop array= makeMapCapacity(repeat);
+    for(int i=0; i < repeat; ++i) {
+        map_append(array, elem);
+    }
+    return array;
+}
+
+oop makeArrayFromString(char *str)
+{
+    size_t len= strlen(str);
+    oop array= makeMapCapacity(len);
+    for(int i=0; i < len; ++i) {
+        map_append(array, makeInteger(str[i]));
+    }
+    return array;
 }
 
 bool isHidden(oop obj) {
