@@ -2046,37 +2046,14 @@ oop prim_Integer(oop scope, oop params)
 
 oop prim_Map(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
+    if (!map_hasIntegerKey(params, 0)) return makeMap();
     oop arg= get(params, Map, elements)[0].value;
     switch (getType(arg)) {
         case Undefined: {
             return makeMap();
         }
         case Integer: {
-            oop map= makeMap();
-            map_set(map, makeInteger(0), arg);
-            return map;
-        }
-        case Function: {
-            oop map= makeMap();
-            map_set(map, get(arg, Function, name), arg);
-            return map;
-        }
-        case String: {
-            oop map= makeMap();
-            size_t len= string_size(arg);
-            for(size_t i=0; i<len; ++i) {
-                map_set(map, makeInteger(i), makeInteger(get(arg, String, value)[i]));
-            }
-            return map;
-        }
-        case Symbol: {
-            oop map= makeMap();
-            size_t len= strlen(get(arg, Symbol, name));
-            for(size_t i=0; i<len; ++i) {
-                map_set(map, makeInteger(i), makeInteger(get(arg, Symbol, name)[i]));
-            }
-            return map;
+            return makeMapCapacity(getInteger(arg));
         }
         case Map: {
             return clone(arg);

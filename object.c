@@ -357,6 +357,14 @@ oop makeMap()
     return newMap;
 }
 
+oop makeMapCapacity(size_t capa)
+{
+    oop map= makeMap();
+    set(map, Map, elements, realloc(get(map, Map, elements), sizeof(struct Pair) * capa));
+    set(map, Map, capacity, capa);
+    return map;
+}
+
 size_t map_size(oop map)
 {
     assert(is(Map, map));
