@@ -1983,6 +1983,42 @@ oop prim_String(oop scope, oop params)
     return null;
 }
 
+oop prim_Symbol(oop scope, oop params)
+{
+    if (!map_hasIntegerKey(params, 0)) return null;
+    oop arg= get(params, Map, elements)[0].value;
+    switch (getType(arg)) {
+        case Integer: {
+            if (map_hasIntegerKey(params, 1)) {
+                int repeat= getInteger(arg);
+                char c= getInteger(get(params, Map, elements)[1].value);
+                return makeSymbolFromChar(c, repeat);
+            }
+            // ???????????????????????????
+            //char *ok= get(arg, String, value);
+            //printf("%s\n", ok);
+            break;
+        }
+        case String: {
+            return makeSymbol(get(arg, String, value));
+        }
+        case Map: {
+            if (map_isArray(arg)) {
+                size_t len= map_size(arg);
+                char *str= malloc(sizeof(char) * len + 1);
+                for (size_t i=0; i < len; ++i) {
+                    str[i]= getInteger(get(arg, Map, elements)[i].value);
+                }
+                return makeSymbolFrom(str);
+            }
+        }
+        case Symbol: {
+            return arg;
+        }
+    }
+    return null;
+}
+
 oop prim_Integer(oop scope, oop params)
 {
     if (!map_hasIntegerKey(params, 0)) return null;
@@ -2085,6 +2121,7 @@ int main(int argc, char **argv)
     map_set(globals, intern("String"      ), makeFunction(prim_String      , intern("String"      ), null, null, globals, null));
     map_set(globals, intern("Integer"     ), makeFunction(prim_Integer     , intern("Integer"     ), null, null, globals, null));
     map_set(globals, intern("Map"         ), makeFunction(prim_Map         , intern("Map"         ), null, null, globals, null));
+    map_set(globals, intern("Symbol"      ), makeFunction(prim_Symbol      , intern("Symbol"      ), null, null, globals, null));
 
     map_set(globals, intern("scope"), makeFunction(prim_scope, intern("scope"), null, null, globals, null));
 

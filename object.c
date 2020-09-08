@@ -249,7 +249,7 @@ oop makeString(char *value)
 // value will be used directly
 oop makeStringFrom(char *value, size_t l)
 {
-    oop newString = malloc(sizeof(union object));
+    oop newString = malloc(sizeof(struct String));
     newString->type = String;
     newString->String.value = value;
     newString->String.size = l;
@@ -316,6 +316,25 @@ oop makeSymbol(char *name)
     newSymb->Symbol.name = strdup(name);
     newSymb->Symbol.prototype = 0;
     return newSymb;
+}
+
+oop makeSymbolFrom(char *name)
+{
+    oop newSymbol= malloc(sizeof(struct Symbol));
+    newSymbol->type= Symbol;
+    newSymbol->Symbol.name= name;
+    newSymbol->Symbol.prototype= 0;
+    return newSymbol;
+}
+
+oop makeSymbolFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeSymbolFrom(str);
 }
 
 oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
