@@ -323,6 +323,11 @@ bool map_hasIntegerKey(oop map, size_t index)
     return index == getInteger(key);
 }
 
+int map_isArray(oop map)
+{
+    return map_hasIntegerKey(map, 0) && map_hasIntegerKey(map, map_size(map) - 1);
+}
+
 int oopcmp(oop a, oop b)
 {
     type_t ta = getType(a), tb = getType(b);
@@ -494,6 +499,16 @@ oop map_values(oop map)
         if (!isHidden(get(map, Map, elements)[i].key)) {
             map_append(values, get(map, Map, elements)[i].value);
         }
+    }
+    return values;
+}
+
+oop map_allValues(oop map)
+{
+    assert(is(Map, map));
+    oop values = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+	map_append(values, get(map, Map, elements)[i].value);
     }
     return values;
 }
