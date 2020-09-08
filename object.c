@@ -360,7 +360,7 @@ oop makeMap()
 oop makeMapCapacity(size_t capa)
 {
     oop map= makeMap();
-    set(map, Map, elements, realloc(get(map, Map, elements), sizeof(struct Pair) * capa));
+    set(map, Map, elements, malloc(sizeof(struct Pair) * capa));
     set(map, Map, capacity, capa);
     return map;
 }
