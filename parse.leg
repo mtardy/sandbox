@@ -1961,8 +1961,7 @@ oop prim_String(oop scope, oop params)
         case Integer: {
             int repeat= getInteger(arg);
             if (!map_hasIntegerKey(params, 1)) {
-                // I put 0 otherwise '\0' won't be printed and can't be seen
-                return makeStringFromChar('0', repeat);
+                return makeStringFromChar('\0', repeat);
             }
             char c= getInteger(get(params, Map, elements)[1].value);
             return makeStringFromChar(c, repeat);
@@ -1984,65 +1983,72 @@ oop prim_String(oop scope, oop params)
             return makeString(get(arg, Symbol, name));
         }
     }
-    return null;
+    runtimeError("cannot make string from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Symbol(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
-    oop arg= get(params, Map, elements)[0].value;
-    switch (getType(arg)) {
-        case Integer: {
-            if (map_hasIntegerKey(params, 1)) {
-                int repeat= getInteger(arg);
-                char c= getInteger(get(params, Map, elements)[1].value);
-                return makeSymbolFromChar(c, repeat);
-            }
-            break;
-        }
-        case String: {
-            return makeSymbol(get(arg, String, value));
-        }
-        case Map: {
-            if (map_isArray(arg)) {
-                size_t len= map_size(arg);
-                char *str= malloc(sizeof(char) * len + 1);
-                for (size_t i=0; i < len; ++i) {
-                    str[i]= getInteger(get(arg, Map, elements)[i].value);
+    oop arg= null;
+    if (map_hasIntegerKey(params, 0)) {
+        arg= get(params, Map, elements)[0].value;
+        switch (getType(arg)) {
+            case Integer: {
+                if (map_hasIntegerKey(params, 1)) {
+                    int repeat= getInteger(arg);
+                    char c= getInteger(get(params, Map, elements)[1].value);
+                    return makeSymbolFromChar(c, repeat);
                 }
-                return makeSymbolFrom(str);
+                break;
             }
-        }
-        case Symbol: {
-            return arg;
+            case String: {
+                return makeSymbol(get(arg, String, value));
+            }
+            case Map: {
+                if (map_isArray(arg)) {
+                    size_t len= map_size(arg);
+                    char *str= malloc(sizeof(char) * len + 1);
+                    for (size_t i=0; i < len; ++i) {
+                        str[i]= getInteger(get(arg, Map, elements)[i].value);
+                    }
+                    return makeSymbolFrom(str);
+                }
+            }
+            case Symbol: {
+                return arg;
+            }
         }
     }
-    return null;
+    runtimeError("cannot make symbol from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Integer(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
-    oop arg= get(params, Map, elements)[0].value;
-    switch (getType(arg)) {
-        case Undefined: {
-            return makeInteger(0);
-        }
-        case Integer: {
-            return arg;
-        }
-        case String: {
-            if (!map_hasIntegerKey(params, 1)) {
-                return makeInteger(strtoll(get(arg, String, value), NULL, 0));
+    oop arg= null;
+    if (map_hasIntegerKey(params, 0)) {
+        arg= get(params, Map, elements)[0].value;
+        switch (getType(arg)) {
+            case Undefined: {
+                return makeInteger(0);
             }
-            int base= getInteger(get(params, Map, elements)[1].value);
-            if (base > 36 || base < 2) {
-                runtimeError("base must be between 2 and 36 inclusive");
+            case Integer: {
+                return arg;
             }
-            return makeInteger(strtoll(get(arg, String, value), NULL, base));
+            case String: {
+                if (!map_hasIntegerKey(params, 1)) {
+                    return makeInteger(strtoll(get(arg, String, value), NULL, 0));
+                }
+                int base= getInteger(get(params, Map, elements)[1].value);
+                if (base > 36 || base < 2) {
+                    runtimeError("base must be between 2 and 36 inclusive");
+                }
+                return makeInteger(strtoll(get(arg, String, value), NULL, base));
+            }
         }
     }
-    return null;
+    runtimeError("cannot make integer from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Map(oop scope, oop params)
@@ -2060,7 +2066,8 @@ oop prim_Map(oop scope, oop params)
             return clone(arg);
         }
     }
-    return null;
+    runtimeError("cannot make map from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Array(oop scope, oop params)
@@ -2091,67 +2098,72 @@ oop prim_Array(oop scope, oop params)
             return clone(arg);
         }
     }
-    return null;
+    runtimeError("cannot make array from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Function(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
-    oop arg= get(params, Map, elements)[0].value;
-    switch (getType(arg)) {
-        case Function: {
-            if (isTrue(get(arg, Function, fixed))) {
-                oop unfix= clone(arg);
-                set(unfix, Function, fixed, makeInteger(0));
-                return unfix;
-            } else {
-                return clone(arg);
-            }
-        }
-        case Map: {
-            if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
-                oop param= arg;
-                oop body= get(params, Map, elements)[1].value;
-                oop parentScope= get(params, Map, elements)[2].value;
-                oop name= get(params, Map, elements)[3].value;
-                if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
-                    return makeFunction(NULL, name, param, body, parentScope, makeInteger(0));
+    oop arg= null;
+    if (map_hasIntegerKey(params, 0)) {
+        arg= get(params, Map, elements)[0].value;
+        switch (getType(arg)) {
+            case Function: {
+                if (isTrue(get(arg, Function, fixed))) {
+                    oop unfix= clone(arg);
+                    set(unfix, Function, fixed, makeInteger(0));
+                    return unfix;
+                } else {
+                    return clone(arg);
                 }
-                // runtime error
+            }
+            case Map: {
+                if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
+                    oop param= arg;
+                    oop body= get(params, Map, elements)[1].value;
+                    oop parentScope= get(params, Map, elements)[2].value;
+                    oop name= get(params, Map, elements)[3].value;
+                    if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
+                        return makeFunction(NULL, name, param, body, parentScope, makeInteger(0));
+                    }
+                }
             }
         }
     }
-    return null;
+    runtimeError("cannot make function from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_Syntax(oop scope, oop params)
 {
-    if (!map_hasIntegerKey(params, 0)) return null;
-    oop arg= get(params, Map, elements)[0].value;
-    switch (getType(arg)) {
-        case Function: {
-            if (isFalse(get(arg, Function, fixed))) {
-                oop fix= clone(arg);
-                set(fix, Function, fixed, makeInteger(1));
-                return fix;
-            } else {
-                return clone(arg);
-            }
-        }
-        case Map: {
-            if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
-                oop param= arg;
-                oop body= get(params, Map, elements)[1].value;
-                oop parentScope= get(params, Map, elements)[2].value;
-                oop name= get(params, Map, elements)[3].value;
-                if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
-                    return makeFunction(NULL, name, param, body, parentScope, makeInteger(1));
+    oop arg= null;
+    if (map_hasIntegerKey(params, 0)) {
+        arg= get(params, Map, elements)[0].value;
+        switch (getType(arg)) {
+            case Function: {
+                if (isFalse(get(arg, Function, fixed))) {
+                    oop fix= clone(arg);
+                    set(fix, Function, fixed, makeInteger(1));
+                    return fix;
+                } else {
+                    return clone(arg);
                 }
-                // runtime error
+            }
+            case Map: {
+                if (map_hasIntegerKey(params, 1) && map_hasIntegerKey(params, 2) && map_hasIntegerKey(params, 3)) {
+                    oop param= arg;
+                    oop body= get(params, Map, elements)[1].value;
+                    oop parentScope= get(params, Map, elements)[2].value;
+                    oop name= get(params, Map, elements)[3].value;
+                    if (is(Map, body) && is(Map, parentScope) && is(Map, name)) {
+                        return makeFunction(NULL, name, param, body, parentScope, makeInteger(1));
+                    }
+                }
             }
         }
     }
-    return null;
+    runtimeError("cannot make syntax from: %s", printString(arg));
+    return NULL;
 }
 
 oop prim_scope(oop scope, oop params)
