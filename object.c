@@ -188,7 +188,7 @@ oop _checkType(oop ptr, type_t type, char *file, int line)
 {
     assert(ptr);
     if (getType(ptr) != type) {
-        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, ptr->type);
+        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, getType(ptr));
     }
     assert(getType(ptr) == type);
     return ptr;

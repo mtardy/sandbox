@@ -937,7 +937,6 @@ oop clone(oop obj)
         case Function: {
             oop fun= malloc(sizeof(*obj));
             memcpy(fun, obj, sizeof(*obj));
-            // shall we deepclone?
             return fun;
         }
     }
@@ -1999,9 +1998,6 @@ oop prim_Symbol(oop scope, oop params)
                 char c= getInteger(get(params, Map, elements)[1].value);
                 return makeSymbolFromChar(c, repeat);
             }
-            // ???????????????????????????
-            //char *ok= get(arg, String, value);
-            //printf("%s\n", ok);
             break;
         }
         case String: {
