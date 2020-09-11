@@ -1,7 +1,7 @@
 LEG	= leg
 CC	= cc
 CFLAGS	= -I/usr/local/include -I/opt/local/include -Wall -Wno-unused-label -g
-LDLIBS	= -L/usr/local/lib -L/opt/local/lib -lgc
+LDLIBS	= -L/usr/local/lib -L/opt/local/lib -lgc -lm
 
 all : parse
 
