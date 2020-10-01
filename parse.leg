@@ -948,7 +948,6 @@ oop clone(oop obj)
         case Undefined:
         case Integer:
         case Float:
-        case Function:
         case Symbol:
             return obj;
         case String:
