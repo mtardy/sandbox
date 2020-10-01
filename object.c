@@ -141,8 +141,8 @@ struct Map {
     struct Pair *elements; // even are keys, odd are values   [ key val key val key val ]
     size_t capacity;
     union {
-	size_t size;       // free Maps will be reset to 0 size on allocation
-	oop    pool;       // free list of Map objects
+    size_t size;       // free Maps will be reset to 0 size on allocation
+    oop    pool;       // free list of Map objects
     };
 };
 
@@ -290,7 +290,7 @@ size_t string_size(oop s)
 oop string_slice(oop str, ssize_t start, ssize_t stop) {
     assert(is(String, str));
     size_t len = string_size(str);
-    if (start < 0) start= start + len; 
+    if (start < 0) start= start + len;
     if (stop  < 0) stop= stop + len;
     if (start < 0 || start > len) return NULL;
     if (stop  < 0 || stop  > len) return NULL;
@@ -368,7 +368,7 @@ oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop paren
 
 oop makeMap()
 {
-    oop newMap = malloc(sizeof(struct Map));			assert(0 == newMap->Map.flags);
+    oop newMap = malloc(sizeof(struct Map));            assert(0 == newMap->Map.flags);
     newMap->type = Map;
     return newMap;
 }
@@ -491,7 +491,7 @@ oop map_insert(oop map, oop key, oop value, size_t pos)
     // check capacity and expand if needed
     if (map_size(map) >= get(map, Map, capacity)) {
         size_t newCapacity = get(map, Map, capacity) * MAP_GROW_SIZE;
-	if (newCapacity < MAP_MIN_SIZE) newCapacity= MAP_MIN_SIZE;
+    if (newCapacity < MAP_MIN_SIZE) newCapacity= MAP_MIN_SIZE;
         set(map, Map, elements, realloc(get(map, Map, elements), sizeof(struct Pair) * newCapacity));
         set(map, Map, capacity, newCapacity);
     }
@@ -608,7 +608,7 @@ oop map_allValues(oop map)
     assert(is(Map, map));
     oop values = makeMap();
     for (size_t i = 0; i < get(map, Map, size); i++) {
-	map_append(values, get(map, Map, elements)[i].value);
+    map_append(values, get(map, Map, elements)[i].value);
     }
     return values;
 }
@@ -616,7 +616,7 @@ oop map_allValues(oop map)
 oop map_slice(oop map, ssize_t start, ssize_t stop) {
     assert(is(Map, map));
     size_t len = map_size(map);
-    if (start < 0) start= start + len; 
+    if (start < 0) start= start + len;
     if (stop  < 0) stop= stop + len;
     if (start < 0 || start > len) return NULL;
     if (stop  < 0 || stop  > len) return NULL;

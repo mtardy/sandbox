@@ -53,13 +53,13 @@ typedef struct jb_record
 
 jb_record *jbs= NULL;
 
-#define jbRecPush()				\
-    struct jb_record jbrec;			\
-    jbrec.next= jbs;				\
+#define jbRecPush()             \
+    struct jb_record jbrec;     \
+    jbrec.next= jbs;            \
     jbs= &jbrec
 
-#define jbRecPop()				\
-    assert(jbs == &jbrec);			\
+#define jbRecPop()              \
+    assert(jbs == &jbrec);      \
     jbs= jbrec.next
 
 // this is the global scope
@@ -176,7 +176,7 @@ oop getVariable(oop object, oop key)
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
         if (null == object) {
-	    runtimeError("Undefined: %s", printString(key));
+            runtimeError("Undefined: %s", printString(key));
         }
     }
     return map_get(object, key);
@@ -187,7 +187,7 @@ oop getMember(oop object, oop key)
     while (!map_hasKey(object, key)) {
         object = map_get(object, __proto___symbol);
         if (null == object) {
-	    return null;
+            return null;
         }
     }
     return map_get(object, key);
@@ -209,7 +209,7 @@ oop setVariable(oop object, oop key, oop value)
 oop getProperty(oop object, oop key)
 {
     if (!map_hasKey(object, key)) {
-	runtimeError("Undefined: .%s", printString(key));
+        runtimeError("Undefined: .%s", printString(key));
     }
     return map_get(object, key);
 }
@@ -770,7 +770,7 @@ paramList    = LPAREN  m:makeMap
                 RPAREN              { $$ = m }
 
 parameter    =  ATAT p:value        { $$ = newUnary(Unsplice_proto, p) }
-	         |       p:ident        { $$ = p }
+             |       p:ident        { $$ = p }
 
 argumentList = LPAREN  m:makeMap
                 (       a:argument  { map_append(m, a) }
@@ -781,7 +781,7 @@ argumentList = LPAREN  m:makeMap
 
 argument    = ATAT  e:value         { $$ = newUnary(Unsplice_proto, e) }
             | MULTI e:exp           { $$ = newUnary(Splice_proto, e) }
-	        |       e:exp           { $$ = e }
+            |       e:exp           { $$ = e }
 
 value   =   BACKTICK   n:value      { $$ = newUnary(Quasiquote_proto, n) }
         |   AT         n:value      { $$ = newUnary(Unquote_proto, n) }
@@ -1122,41 +1122,39 @@ oop expandUnquotes(oop scope, oop ast)
 
     oop map= makeMap();
     if (map_isArray(ast)) {
-	for (size_t i= 0;  i < map_size(ast);  ++i) {
-	    struct Pair *pair= &get(ast, Map, elements)[i];
-	    if (!is(Map, pair->value)) {
-		map_append(map, clone(pair->value));
-		continue;
-	    }
-	    oop proto= map_get(pair->value, __proto___symbol);
-	    if (Unquote_proto  == proto) {
-		map_append(map, eval(scope, map_get(pair->value, rhs_symbol)));
-		continue;
-	    }
-	    if (Unsplice_proto == proto) {
-		oop sub= eval(scope, map_get(pair->value, rhs_symbol));
-		if (is(Map, sub) && (Map_proto == map_get(sub, __proto___symbol))) sub= map_get(sub, value_symbol);
-		if (!map_isArray(sub)) runtimeError("cannot splice non-array: %s", printString(sub));
-		for (size_t j= 0;  j < map_size(sub);  ++j)
-		    map_append(map, get(sub, Map, elements)[j].value);
-		continue;
-	    }
-	    map_append(map, expandUnquotes(scope, pair->value));
-	}
+        for (size_t i= 0;  i < map_size(ast);  ++i) {
+            struct Pair *pair= &get(ast, Map, elements)[i];
+            if (!is(Map, pair->value)) {
+                map_append(map, clone(pair->value));
+                continue;
+            }
+            oop proto= map_get(pair->value, __proto___symbol);
+            if (Unquote_proto  == proto) {
+                map_append(map, eval(scope, map_get(pair->value, rhs_symbol)));
+                continue;
+            }
+            if (Unsplice_proto == proto) {
+                oop sub= eval(scope, map_get(pair->value, rhs_symbol));
+                if (is(Map, sub) && (Map_proto == map_get(sub, __proto___symbol))) sub= map_get(sub, value_symbol);
+                if (!map_isArray(sub)) runtimeError("cannot splice non-array: %s", printString(sub));
+                for (size_t j= 0;  j < map_size(sub);  ++j)
+                    map_append(map, get(sub, Map, elements)[j].value);
+                    continue;
+            }
+            map_append(map, expandUnquotes(scope, pair->value));
+        }
     }
     else {
-	for (size_t i= 0;  i < map_size(ast);  ++i) {
-	    struct Pair *pair= &get(ast, Map, elements)[i];
-	    oop key= expandUnquotes(scope, pair->key);
-	    if (!is(Map, pair->value)) {
-		map_set(map, key, clone(pair->value));
-		continue;
-	    }
-	    if (__proto___symbol == key)
-		map_set(map, key, pair->value);
-	    else
-		map_set(map, key, expandUnquotes(scope, pair->value));
-	}
+        for (size_t i= 0;  i < map_size(ast);  ++i) {
+            struct Pair *pair= &get(ast, Map, elements)[i];
+            oop key= expandUnquotes(scope, pair->key);
+            if (!is(Map, pair->value)) {
+                map_set(map, key, clone(pair->value));
+                continue;
+            }
+            if (__proto___symbol == key) map_set(map, key, pair->value);
+            else map_set(map, key, expandUnquotes(scope, pair->value));
+        }
     }
     return map;
 }
@@ -1237,22 +1235,22 @@ oop apply(oop scope, oop this, oop func, oop args, oop ast)
     switch (jbt) {
         case j_return: {
             untrace(ast);
-	    delScope(localScope);
+            delScope(localScope);
             oop result = jbs->result;
             jbRecPop();
             return result;
         }
         case j_break: {
-	    delScope(localScope);
+            delScope(localScope);
             runtimeError("break outside of a loop or switch");
         }
         case j_continue: {
-	    delScope(localScope);
+            delScope(localScope);
             runtimeError("continue outside of a loop");
         }
         case j_throw: {
             untrace(ast);
-	    delScope(localScope);
+            delScope(localScope);
             oop res= jbs->result;
             jbRecPop();
             jbs->result= res;
@@ -1729,7 +1727,7 @@ oop eval(oop scope, oop ast)
                     runtimeError("index out of bounds");
                 }
                 return res;
-            } 
+            }
             case Map: {
                 ssize_t last= stop == null ? map_size(pre) : getInteger(stop);
                 oop res= map_slice(pre, first, last);
@@ -1925,8 +1923,8 @@ oop prim_keys(oop scope, oop params)
 oop prim_allKeys(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
-	oop arg= get(params, Map, elements)[0].value;
-	if (is(Map, arg)) return map_allKeys(arg);
+        oop arg= get(params, Map, elements)[0].value;
+        if (is(Map, arg)) return map_allKeys(arg);
     }
     return null;
 }
@@ -1934,8 +1932,8 @@ oop prim_allKeys(oop scope, oop params)
 oop prim_values(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
-	oop arg= get(params, Map, elements)[0].value;
-	if (is(Map, arg)) return map_values(arg);
+        oop arg= get(params, Map, elements)[0].value;
+        if (is(Map, arg)) return map_values(arg);
     }
     return null;
 }
@@ -1943,8 +1941,8 @@ oop prim_values(oop scope, oop params)
 oop prim_allValues(oop scope, oop params)
 {
     if (map_hasIntegerKey(params, 0)) {
-	oop arg= get(params, Map, elements)[0].value;
-	if (is(Map, arg)) return map_allValues(arg);
+        oop arg= get(params, Map, elements)[0].value;
+        if (is(Map, arg)) return map_allValues(arg);
     }
     return null;
 }
@@ -1997,20 +1995,20 @@ oop evalArgs(oop scope, oop asts)
     oop    args=  makeMap();
     size_t nargs= map_size(asts);
     for (size_t i= 0;  i < nargs;  ++i) {
-	oop ast= get(asts, Map, elements)[i].value;
-	if (is(Map, ast) && (Splice_proto == map_get(ast, __proto___symbol))) {
-	    oop splice= eval(scope, map_get(ast, rhs_symbol));
-	    if (!is(Map, splice)) map_append(args, splice);
-	    else {
-		size_t nsplice= map_size(splice);
-		for (size_t j= 0;  j < nsplice;  ++j) {
-		    map_append(args, get(splice, Map, elements)[j].value);
-		}
-	    }
-	}
-	else {
-	    map_append(args, eval(scope, ast));
-	}
+        oop ast= get(asts, Map, elements)[i].value;
+        if (is(Map, ast) && (Splice_proto == map_get(ast, __proto___symbol))) {
+            oop splice= eval(scope, map_get(ast, rhs_symbol));
+            if (!is(Map, splice)) map_append(args, splice);
+            else {
+                size_t nsplice= map_size(splice);
+                for (size_t j= 0;  j < nsplice;  ++j) {
+                    map_append(args, get(splice, Map, elements)[j].value);
+                }
+            }
+        }
+        else {
+            map_append(args, eval(scope, ast));
+        }
     }
     return args;
 }
@@ -2370,10 +2368,10 @@ int main(int argc, char **argv)
     }
 
     if (opt_g) {
-	if      (nalloc <           1024) printf("[GC: %lli bytes allocated]\n",         nalloc                   );
-	else if (nalloc <      1024*1024) printf("[GC: %lli kB allocated]\n",            nalloc /            1024 );
-	else if (nalloc < 1024*1024*1024) printf("[GC: %.2f MB allocated]\n",    (double)nalloc / (     1024*1024));
-	else                              printf("[GC: %.2f GB allocated]\n",    (double)nalloc / (1024*1024*1024));
+    if      (nalloc <           1024) printf("[GC: %lli bytes allocated]\n",         nalloc                   );
+    else if (nalloc <      1024*1024) printf("[GC: %lli kB allocated]\n",            nalloc /            1024 );
+    else if (nalloc < 1024*1024*1024) printf("[GC: %.2f MB allocated]\n",    (double)nalloc / (     1024*1024));
+    else                              printf("[GC: %.2f GB allocated]\n",    (double)nalloc / (1024*1024*1024));
     }
 
     return 0;
