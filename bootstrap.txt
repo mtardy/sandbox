@@ -4,7 +4,7 @@ fun require(__fileName__) {
     if (__requires__[__fileName__] != null) {
         return __requires__[__fileName__]
     }
-    import(__fileName__); 
+    import(__fileName__);
     __requires__[__fileName__]= scope();
     return scope();
 }

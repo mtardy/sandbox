@@ -81,18 +81,16 @@ syntax double(a) {
     return `(@a+@a)
 }
 
-double(21)
+println(double(21))
 
-syntax until(c, b) {
+syntax until (c) b {
     return `(while (!@c) @b)
 }
 
 var x = 0;
-/*
-until(x==10) {
+until (x==10) {
     println(x++)
 }
-*/
 
 println(`x);
 

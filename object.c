@@ -197,7 +197,7 @@ oop _checkType(oop ptr, type_t type, char *file, int line)
 {
     assert(ptr);
     if (getType(ptr) != type) {
-        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, ptr->type);
+        fprintf(stderr, "\n%s:%i: expected %i got %i\n", file, line, type, getType(ptr));
     }
     assert(getType(ptr) == type);
     return ptr;
@@ -262,9 +262,45 @@ oop makeString(char *value)
     return newString;
 }
 
+// value will be used directly
+oop makeStringFrom(char *value, size_t l)
+{
+    oop newString = malloc(sizeof(struct String));
+    newString->type = String;
+    newString->String.value = value;
+    newString->String.size = l;
+    return newString;
+}
+
+oop makeStringFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeStringFrom(str, repeat);
+}
+
 size_t string_size(oop s)
 {
     return get(s, String, size);
+}
+
+oop string_slice(oop str, ssize_t start, ssize_t stop) {
+    assert(is(String, str));
+    size_t len = string_size(str);
+    if (start < 0) start= start + len; 
+    if (stop  < 0) stop= stop + len;
+    if (start < 0 || start > len) return NULL;
+    if (stop  < 0 || stop  > len) return NULL;
+    if (start > stop) return NULL;
+
+    size_t cpylen = stop - start;
+    char *slice= memcheck(malloc(sizeof(char) * (cpylen + 1)));
+    memcpy(slice, get(str, String, value) + start, cpylen);
+    slice[cpylen]= '\0';
+    return makeStringFrom(slice, cpylen);
 }
 
 oop string_concat(oop str1, oop str2)
@@ -274,11 +310,7 @@ oop string_concat(oop str1, oop str2)
     memcpy(concat, get(str1, String, value), string_size(str1));
     memcpy(concat + string_size(str1), get(str2, String, value), string_size(str2));
     concat[len]= '\0';
-    oop newString = malloc(sizeof(struct String));
-    newString->type = String;
-    newString->String.value = concat;
-    newString->String.size = len;
-    return newString;
+    return makeStringFrom(concat, len);
 }
 
 oop string_mul(oop str, oop factor)
@@ -290,11 +322,7 @@ oop string_mul(oop str, oop factor)
         memcpy(concat + (i * string_size(str)), get(str, String, value), string_size(str));
     }
     concat[len]= '\0';
-    oop newString = malloc(sizeof(struct String));
-    newString->type = String;
-    newString->String.value = concat;
-    newString->String.size = len;
-    return newString;
+    return makeStringFrom(concat, len);
 }
 
 oop makeSymbol(char *name)
@@ -304,6 +332,25 @@ oop makeSymbol(char *name)
     newSymb->Symbol.name = strdup(name);
     newSymb->Symbol.prototype = 0;
     return newSymb;
+}
+
+oop makeSymbolFrom(char *name)
+{
+    oop newSymbol= malloc(sizeof(struct Symbol));
+    newSymbol->type= Symbol;
+    newSymbol->Symbol.name= name;
+    newSymbol->Symbol.prototype= 0;
+    return newSymbol;
+}
+
+oop makeSymbolFromChar(char c, int repeat)
+{
+    char *str= malloc(sizeof(char) * (repeat + 1));
+    for (int i=0; i<repeat; ++i) {
+        str[i]= c;
+    }
+    str[repeat]= '\0';
+    return makeSymbolFrom(str);
 }
 
 oop makeFunction(primitive_t primitive, oop name, oop param, oop body, oop parentScope, oop fixed)
@@ -326,6 +373,14 @@ oop makeMap()
     return newMap;
 }
 
+oop makeMapCapacity(size_t capa)
+{
+    oop map= makeMap();
+    set(map, Map, elements, malloc(sizeof(struct Pair) * capa));
+    set(map, Map, capacity, capa);
+    return map;
+}
+
 size_t map_size(oop map)
 {
     assert(is(Map, map));
@@ -338,6 +393,14 @@ bool map_hasIntegerKey(oop map, size_t index)
     oop key= get(map, Map, elements)[index].key;
     if (!isInteger(key)) return 0;
     return index == getInteger(key);
+}
+
+bool map_isArray(oop map)
+{
+    assert(is(Map, map));
+    size_t size= map_size(map);
+    if (size == 0) return true;
+    return map_hasIntegerKey(map, 0) && map_hasIntegerKey(map, size-1);
 }
 
 int oopcmp(oop a, oop b)
@@ -477,6 +540,25 @@ oop map_append(oop map, oop value)
     return map_set(map, makeInteger(map_size(map)), value);
 }
 
+oop makeArrayFromElement(oop elem, int repeat)
+{
+    oop array= makeMapCapacity(repeat);
+    for(int i=0; i < repeat; ++i) {
+        map_append(array, elem);
+    }
+    return array;
+}
+
+oop makeArrayFromString(char *str)
+{
+    size_t len= strlen(str);
+    oop array= makeMapCapacity(len);
+    for(int i=0; i < len; ++i) {
+        map_append(array, makeInteger(str[i]));
+    }
+    return array;
+}
+
 bool isHidden(oop obj) {
     if (is(Symbol, obj)) {
         char *s = get(obj, Symbol, name);
@@ -519,6 +601,36 @@ oop map_values(oop map)
         }
     }
     return values;
+}
+
+oop map_allValues(oop map)
+{
+    assert(is(Map, map));
+    oop values = makeMap();
+    for (size_t i = 0; i < get(map, Map, size); i++) {
+	map_append(values, get(map, Map, elements)[i].value);
+    }
+    return values;
+}
+
+oop map_slice(oop map, ssize_t start, ssize_t stop) {
+    assert(is(Map, map));
+    size_t len = map_size(map);
+    if (start < 0) start= start + len; 
+    if (stop  < 0) stop= stop + len;
+    if (start < 0 || start > len) return NULL;
+    if (stop  < 0 || stop  > len) return NULL;
+    if (start > stop) return NULL;
+
+    oop slice= makeMap();
+    if (start < stop) {
+        if (!map_hasIntegerKey(map, start   )) return NULL;
+        if (!map_hasIntegerKey(map, stop - 1)) return NULL;
+        for (size_t i= start; i < stop; ++i) {
+            map_append(slice, get(map, Map, elements)[i].value);
+        }
+    }
+    return slice;
 }
 
 DECLARE_BUFFER(oop, OopStack);
