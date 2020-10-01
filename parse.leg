@@ -1736,8 +1736,10 @@ oop eval(oop scope, oop ast)
                 }
                 return res;
             }
+            default: {
+                runtimeError("slicing a non-String or non-Map");
+            }
         }
-        runtimeError("slicing a non-String or non-Map");
     }
     case t_Symbol:
     case t_Integer:
@@ -2100,8 +2102,10 @@ oop prim_String(oop scope, oop params)
         case Symbol: {
             return makeString(get(arg, Symbol, name));
         }
+        default: {
+            runtimeError("cannot make string from: %s", printString(arg));
+        }
     }
-    runtimeError("cannot make string from: %s", printString(arg));
     return NULL;
 }
 
@@ -2135,9 +2139,11 @@ oop prim_Symbol(oop scope, oop params)
             case Symbol: {
                 return arg;
             }
+            default: {
+                runtimeError("cannot make symbol from: %s", printString(arg));
+            }
         }
     }
-    runtimeError("cannot make symbol from: %s", printString(arg));
     return NULL;
 }
 
@@ -2163,9 +2169,11 @@ oop prim_Integer(oop scope, oop params)
                 }
                 return makeInteger(strtoll(get(arg, String, value), NULL, base));
             }
+            default: {
+                runtimeError("cannot make integer from: %s", printString(arg));
+            }
         }
     }
-    runtimeError("cannot make integer from: %s", printString(arg));
     return NULL;
 }
 
@@ -2183,8 +2191,10 @@ oop prim_Map(oop scope, oop params)
         case Map: {
             return clone(arg);
         }
+        default: {
+            runtimeError("cannot make map from: %s", printString(arg));
+        }
     }
-    runtimeError("cannot make map from: %s", printString(arg));
     return NULL;
 }
 
@@ -2215,8 +2225,10 @@ oop prim_Array(oop scope, oop params)
         case Map: {
             return clone(arg);
         }
+        default: {
+            runtimeError("cannot make array from: %s", printString(arg));
+        }
     }
-    runtimeError("cannot make array from: %s", printString(arg));
     return NULL;
 }
 
@@ -2246,9 +2258,11 @@ oop prim_Function(oop scope, oop params)
                     }
                 }
             }
+            default: {
+                runtimeError("cannot make function from: %s", printString(arg));
+            }
         }
     }
-    runtimeError("cannot make function from: %s", printString(arg));
     return NULL;
 }
 
@@ -2278,9 +2292,11 @@ oop prim_Syntax(oop scope, oop params)
                     }
                 }
             }
+            default: {
+                runtimeError("cannot make syntax from: %s", printString(arg));
+            }
         }
     }
-    runtimeError("cannot make syntax from: %s", printString(arg));
     return NULL;
 }
 
